@@ -18,8 +18,8 @@
 #
 ##############################################################################
 {
-    'name': 'Stock Voucher UX',
-    'version': "17.0.1.2.0",
+    'name': 'sale order type invoice policy invoice link',
+    'version': "16.0.1.0.0",
     'category': 'Warehouse Management',
     'sequence': 14,
     'summary': '',
@@ -29,18 +29,13 @@
     'images': [
     ],
     'depends': [
-        'stock_voucher',
-        'report_aeroo',
-        'l10n_ar_stock',
+        'sale_order_type_invoice_policy','stock_picking_invoice_link'
     ],
     'data': [
-        'views/stock_book_views.xml',
-        'views/stock_picking_views.xml',
-        'views/report_deliveryslip.xml',
-    ],
+ ],
     'demo': [
     ],
-    'installable': True,
-    'auto_install': False,
+    'installable': False,
+    'auto_install': True,
     'application': False,
 }

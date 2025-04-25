@@ -70,18 +70,20 @@ class StockMoveLine(models.Model):
                 "You can't transfer more quantity than the quantity on stock!"))
 
     def _check_quantity_available(self):
-        location = self.env['stock.location'].search([
-            ('company_id', '=', self.picking_id.company_id.id),
-            ('id', '=', self.picking_id.location_id.id)
-        ], limit=1)
-        quant = self.env['stock.quant'].search([
-            ('product_id', '=', self.product_id.id),
-            ('location_id', '=', location.id)
-        ], limit=1)
-        if quant:
-            return quant.available_quantity - self.quantity
-        else:
-            return 0.0
+        self.ensure_one()
+        total_available = 0.0
+        if not self.env.context.get('trigger_assign') and not self.env.context.get('from_inverse_qty_done'):
+            locations = self.env['stock.location'].search([
+                ('id', 'child_of', self.picking_id.location_id.id),
+                ('company_id', '=', self.picking_id.company_id.id)
+            ])
+            quants = self.env['stock.quant'].search([
+                ('product_id', '=', self.product_id.id),
+                ('location_id', 'in', locations.ids)
+            ])
+            total_available = sum(quants.mapped('available_quantity')) - self.quantity
+        return total_available
+
 
     @api.constrains('quantity')
     def _check_quantity(self):
@@ -116,5 +118,10 @@ class StockMoveLine(models.Model):
                 if moves:
                     aggregated_move_lines[line]['description'] = False
                     aggregated_move_lines[line]['name'] = ', '.join(moves.mapped('origin_description'))
-        
+
         return aggregated_move_lines
+
+    def _inverse_qty_done(self):
+        for line in self:
+            line.with_context(from_inverse_qty_done=True).quantity = line.qty_done
+            line.picked = line.quantity > 0

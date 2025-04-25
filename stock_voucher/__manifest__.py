@@ -19,7 +19,7 @@
 ##############################################################################
 {
     'name': 'Stock Voucher',
-    'version': "17.0.1.1.0",
+    'version': "17.0.1.3.0",
     'category': 'Warehouse Management',
     'sequence': 14,
     'summary': '',
@@ -30,12 +30,14 @@
     ],
     'depends': [
         'sale_stock',
-        'stock_ux'
+        'web_ir_actions_act_multi',
+        'stock_ux',
     ],
     'data': [
         'security/stock_voucher_security.xml',
         'security/ir.model.access.csv',
         'wizards/stock_print_stock_voucher_views.xml',
+        'wizards/stock_picking_wizard_views.xml',
         'views/stock_book_views.xml',
         'views/stock_picking_voucher_views.xml',
         'views/stock_picking_type_views.xml',
@@ -44,6 +46,8 @@
         'data/ir_sequence_data.xml',
         'data/stock_book_data.xml',
         'report/stock_report_views.xml',
+        'report/ir.action.reports.xml',
+        'report/picking_templates.xml',
     ],
     'demo': [
     ],

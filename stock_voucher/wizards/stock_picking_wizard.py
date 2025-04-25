@@ -1,9 +1,9 @@
 from odoo import fields, api, models, Command, exceptions
+from odoo.exceptions import UserError
 
 
 class StockPickingZpl(models.TransientModel):
-    _name = 'product.label.layout'
-    _description = "Print Stock Voucher"
+    _inherit = 'product.label.layout'
 
     picking_id = fields.Many2one('stock.picking',string='picking')
     line_ids = fields.One2many('stock.picking.zpl.lines','picking_zpl_id', string='Moves')
@@ -13,30 +13,36 @@ class StockPickingZpl(models.TransientModel):
         rec = super().default_get(default_fields)
         active_ids = self._context.get('active_ids') or self._context.get('active_id')
         active_model = self._context.get('active_model')
-        if active_model == 'stock.picking':
+        if active_model == 'stock.picking' and active_ids:
+            picking = self.env[active_model].browse(active_ids)
+            rec['picking_id'] = picking.id
             move_ids = self.env[active_model].browse(active_ids).mapped('move_ids').filtered(lambda x: x.quantity > 0 )
             rec['line_ids'] = [Command.create({'move_id': x.id, 'move_quantity':x.quantity,'move_uom_id': x.product_uom}) for x in move_ids]
         return rec
     
     def action_print(self):
         self.ensure_one()
-        report_id = self.env.ref("stock_ux.action_custom_barcode_transfer_template_view_zpl")
+        report_id = self.env.ref("stock_voucher.action_custom_barcode_transfer_template_view_zpl")
         report_action = report_id.report_action(self.ids)
         report_action['close_on_report_download']=True
         return report_action
     
     def action_print_pdf(self):
         self.ensure_one()
-        report_id = self.env.ref("stock_ux.action_custom_label_transfer_template_view_pdf")
-        report_action = report_id.report_action(self.ids)
-        report_action['close_on_report_download']=True
+        picking_id = self.picking_id.id if self.picking_id else False
+        if not picking_id:
+            raise UserError("No se encontró un picking asociado al registro.")  
+        report_id = self.env.ref("stock_voucher.action_custom_label_transfer_template_view_pdf")
+        report_action = report_id.report_action([picking_id])
+        report_action['close_on_report_download'] = True   
         return report_action
+
 
 class StockPickingZplLines(models.TransientModel):
     _name = 'stock.picking.zpl.lines'
     _description = "Print Stock Voucher lines"
 
-    picking_zpl_id = fields.Many2one('stock.picking.zpl')
+    picking_zpl_id = fields.Many2one('product.label.layout')
 
     move_id = fields.Many2one('stock.move')
 
@@ -51,5 +57,3 @@ class StockPickingZplLines(models.TransientModel):
         for line in self:
             if line.move_quantity > line.move_id.quantity:
                 raise exceptions.ValidationError("La cantidad a imprimir no puede ser mayor que la cantidad original.")
-
-

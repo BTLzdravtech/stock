@@ -7,6 +7,7 @@ from odoo.addons.stock_request.models.stock_move import StockMove
 
 
 def new_copy_data(self, default=None):
+    # TODO vk: monkey patch, discuss
     """ Nosotros ya copiamos la allocation en el split de arriba y ademas
     #     si se copiasen en el copy data, con algunas rutas se esta duplicando
     #     el allocation en casos donde no debe hacerlo, solo queremos duplicar

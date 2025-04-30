@@ -10,6 +10,7 @@ class ProductProduct(models.Model):
 
     @api.model
     def name_search(self, name, args=None, operator='ilike', limit=100):
+        # TODO vk: lock for arg
         res = super().name_search(
             name, args=args, operator=operator, limit=limit)
         if not limit or len(res) < limit:

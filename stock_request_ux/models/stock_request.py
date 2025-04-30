@@ -44,6 +44,7 @@ class StockRequest(models.Model):
             rec.picking_count = len(rec.picking_ids)
 
     def action_cancel(self):
+        # TODO vk: lock for arg
         """ Con esto queremos cancelar todos lo moves/pickings vinculados (que
         se hayan generado por la rule). No es muy elegante buscar por producto
         pero al no estar almacenado el link al request fue la mas facil.

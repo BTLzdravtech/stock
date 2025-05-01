@@ -67,12 +67,12 @@ class StockMoveLine(models.Model):
                 x.picking_id.picking_type_id.block_manual_lines and
                 x._check_quantity_available() < 0)):
             raise ValidationError(_(
-                "You can't transfer more quantity than the quantity on stock!"))
+                "You can't transfer more quantity than the quantity on stock for product: %s.") % self.name)
 
     def _check_quantity_available(self):
         self.ensure_one()
         total_available = 0.0
-        if not self.env.context.get('trigger_assign') and not self.env.context.get('from_inverse_qty_done') and not self.env.context.get('sale_automation'):
+        if self.product_id.detailed_type == 'product' and not self.env.context.get('trigger_assign') and not self.env.context.get('from_inverse_qty_done') and not self.env.context.get('sale_automation'):
             locations = self.env['stock.location'].search([
                 ('id', 'child_of', self.picking_id.location_id.id),
                 ('company_id', '=', self.picking_id.company_id.id)
@@ -83,18 +83,6 @@ class StockMoveLine(models.Model):
             ])
             total_available = sum(quants.mapped('available_quantity')) - self.quantity
         return total_available
-
-
-    @api.constrains('quantity')
-    def _check_quantity(self):
-        """If we work on move lines we want to ensure quantities are ok"""
-        if self._context.get('put_in_pack', False):
-            return
-        self.mapped('move_id')._check_quantity()
-        # We verify the case that does not have 'move_id' to restrict how does_check_quantity() in moves
-        if any(self.filtered(lambda x: not x.move_id and x.picking_id.picking_type_id.block_additional_quantity)):
-            raise ValidationError(
-                _('You can not transfer more than the initial demand!'))
 
     @api.model_create_multi
     def create(self, vals_list):

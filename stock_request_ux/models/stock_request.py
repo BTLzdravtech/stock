@@ -44,28 +44,31 @@ class StockRequest(models.Model):
             rec.picking_count = len(rec.picking_ids)
 
     def action_cancel(self):
-        # TODO vk: lock for arg
-        """ Con esto queremos cancelar todos lo moves/pickings vinculados (que
-        se hayan generado por la rule). No es muy elegante buscar por producto
-        pero al no estar almacenado el link al request fue la mas facil.
-        TODO: supongo que lo ideal seria:
-        1) poder identificar bien las lineas, ya sea llevando el stock request
-        a cada move y no solo el inicial, o obteniendo el move original y luego
-        llegar a los otros por los links entre moves (movimiento de destino).
-        Esto seria mas que nada para que sea mas elegante
-        2) por ahora agregamos constraint para que no pueda haber dos productos
-        iguales en pero en realidad habria que en vez de cancelar, hacer un
-        cancel remaining solo por lo que este request representaba. No lo
-        podemos hacer analogo a como se hace en ventas ya que las ventas
-        mantienen distintos moves y por eso funciona bien.
-        """
-        # ahora sobre escribimos y llamamos a nuestro cancel que propaga
-        # deberiamos ver de hacer monkey patch mejor para que sea
-        # heredable por otros modulos
-        for move in self.sudo().mapped('move_ids'):
-            move._action_cancel()
-        self.write({'state': 'cancel'})
-        return True
+        if self.env.company.country_id.code == 'AR':
+            # TODO vk: lock for arg
+            """ Con esto queremos cancelar todos lo moves/pickings vinculados (que
+            se hayan generado por la rule). No es muy elegante buscar por producto
+            pero al no estar almacenado el link al request fue la mas facil.
+            TODO: supongo que lo ideal seria:
+            1) poder identificar bien las lineas, ya sea llevando el stock request
+            a cada move y no solo el inicial, o obteniendo el move original y luego
+            llegar a los otros por los links entre moves (movimiento de destino).
+            Esto seria mas que nada para que sea mas elegante
+            2) por ahora agregamos constraint para que no pueda haber dos productos
+            iguales en pero en realidad habria que en vez de cancelar, hacer un
+            cancel remaining solo por lo que este request representaba. No lo
+            podemos hacer analogo a como se hace en ventas ya que las ventas
+            mantienen distintos moves y por eso funciona bien.
+            """
+            # ahora sobre escribimos y llamamos a nuestro cancel que propaga
+            # deberiamos ver de hacer monkey patch mejor para que sea
+            # heredable por otros modulos
+            for move in self.sudo().mapped('move_ids'):
+                move._action_cancel()
+            self.write({'state': 'cancel'})
+            return True
+        else:
+            return super().action_cancel()
 
     def button_cancel_remaining(self):
         for rec in self:

@@ -2,9 +2,8 @@
 # For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
-from odoo import models, api, fields, _
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
-from odoo.tools import float_is_zero
 
 
 class StockMoveLine(models.Model):
@@ -67,12 +66,12 @@ class StockMoveLine(models.Model):
                 x.picking_id.picking_type_id.block_manual_lines and
                 x._check_quantity_available() < 0)):
             raise ValidationError(_(
-                "You can't transfer more quantity than the quantity on stock!"))
+                "You can't transfer more quantity than the quantity on stock for product: %s.") % self.name)
 
     def _check_quantity_available(self):
         self.ensure_one()
         total_available = 0.0
-        if not self.env.context.get('trigger_assign') and not self.env.context.get('from_inverse_qty_done') and not self.env.context.get('sale_automation'):
+        if self.product_id.detailed_type == 'product' and not self.env.context.get('trigger_assign') and not self.env.context.get('from_inverse_qty_done') and not self.env.context.get('sale_automation'):
             locations = self.env['stock.location'].search([
                 ('id', 'child_of', self.picking_id.location_id.id),
                 ('company_id', '=', self.picking_id.company_id.id)
@@ -83,18 +82,6 @@ class StockMoveLine(models.Model):
             ])
             total_available = sum(quants.mapped('available_quantity')) - self.quantity
         return total_available
-
-
-    @api.constrains('quantity')
-    def _check_quantity(self):
-        """If we work on move lines we want to ensure quantities are ok"""
-        if self._context.get('put_in_pack', False):
-            return
-        self.mapped('move_id')._check_quantity()
-        # We verify the case that does not have 'move_id' to restrict how does_check_quantity() in moves
-        if any(self.filtered(lambda x: not x.move_id and x.picking_id.picking_type_id.block_additional_quantity)):
-            raise ValidationError(
-                _('You can not transfer more than the initial demand!'))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -111,13 +98,22 @@ class StockMoveLine(models.Model):
         aggregated_move_lines = super()._get_aggregated_product_quantities(**kwargs)
         use_origin = self.env['ir.config_parameter'].sudo().get_param('stock_ux.delivery_slip_use_origin', 'False') == 'True'
         if use_origin:
-            for line in aggregated_move_lines:
-                moves = self.filtered(
-                    lambda sml: sml.product_id == aggregated_move_lines[line]['product']
-                ).mapped('move_id').filtered(lambda m: m.origin_description)
-                if moves:
-                    aggregated_move_lines[line]['description'] = False
-                    aggregated_move_lines[line]['name'] = ', '.join(moves.mapped('origin_description'))
+            move_line_by_move = {}
+            for sml in self:
+                move = sml.move_id
+                if move and move.origin_description:
+                    move_line_by_move.setdefault(move.id, {
+                        'description': move.origin_description,
+                        'product_id': sml.product_id.id
+                    })
+            used_moves = set()
+            for line_data in aggregated_move_lines.values():
+                for move_id, move_info in move_line_by_move.items():
+                    if move_info['product_id'] == line_data['product'].id and move_id not in used_moves:
+                        line_data['description'] = False
+                        line_data['name'] = move_info['description']
+                        used_moves.add(move_id)
+                        break
 
         return aggregated_move_lines
 
@@ -125,3 +121,34 @@ class StockMoveLine(models.Model):
         for line in self:
             line.with_context(from_inverse_qty_done=True).quantity = line.qty_done
             line.picked = line.quantity > 0
+
+    def _get_aggregated_properties(self, move_line=False, move=False):
+        use_origin = self.env['ir.config_parameter'].sudo().get_param('stock_ux.delivery_slip_use_origin', 'False') == 'True'
+        if use_origin:
+            move = move or move_line.move_id
+            uom = move.product_uom or move_line.product_uom_id
+            name = move.product_id.display_name
+            description = move.origin_description or ""
+            product = move.product_id
+            if description.startswith(name):
+                description = description.removeprefix(name).strip()
+            elif description.startswith(product.name):
+                description = description.removeprefix(product.name).strip()
+            line_key = f'{product.id}_{product.display_name}_{description or ""}_{uom.id}_{move.product_packaging_id or ""}'
+            bom_line = getattr(move, 'bom_line_id', False)
+            if bom_line and bom_line.bom_id:
+                bom = bom_line.bom_id
+                line_key += f'_{bom.id if bom else ""}'
+            else:
+                bom = False
+            return {
+                'line_key': line_key,
+                'name': name,
+                'description': description,
+                'product_uom': uom,
+                'move': move,
+                'packaging': move.product_packaging_id,
+                'bom': bom
+            }
+        else:
+            return super()._get_aggregated_properties(move_line=move_line, move=move)

@@ -45,7 +45,6 @@ class StockRequest(models.Model):
 
     def action_cancel(self):
         if self.env.company.country_id.code == 'AR':
-            # TODO vk: lock for arg
             """ Con esto queremos cancelar todos lo moves/pickings vinculados (que
             se hayan generado por la rule). No es muy elegante buscar por producto
             pero al no estar almacenado el link al request fue la mas facil.

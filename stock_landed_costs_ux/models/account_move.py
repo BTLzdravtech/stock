@@ -8,7 +8,6 @@ class AccountMove(models.Model):
     _inherit = 'account.move'
 
     def button_create_landed_costs(self):
-        # DONETODO vk: lock for arg,monkey patch
         if self.env.company.country_id.code == 'AR':
             """Modifies the original method changing the price_unit of the landed_costs
             If the account.move has a different currency change from the one defined in the company,

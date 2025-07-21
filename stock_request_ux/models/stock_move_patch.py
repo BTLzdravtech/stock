@@ -7,7 +7,7 @@ from odoo.addons.stock_request.models.stock_move import StockMove
 
 
 def new_copy_data(self, default=None):
-    # NOTDONETODO vk: monkey patch, discuss
+    # TODO os: why there is monkey patch when only super is call in function, please delete it
     """ Nosotros ya copiamos la allocation en el split de arriba y ademas
     #     si se copiasen en el copy data, con algunas rutas se esta duplicando
     #     el allocation en casos donde no debe hacerlo, solo queremos duplicar

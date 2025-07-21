@@ -26,7 +26,7 @@ class StockLot(models.Model):
     @api.model
     def name_search(
             self, name, args=None, operator='ilike', limit=100):
-        # TODO vk: lock for arg
+        # TODO vk: lock for arg - module not installed
         args = args or []
         if name:
             recs = self.search(

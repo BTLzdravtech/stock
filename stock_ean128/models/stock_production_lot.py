@@ -24,14 +24,15 @@ class StockLot(models.Model):
             rec.ean_128 = name
 
     @api.model
-    def name_search(
-            self, name, args=None, operator='ilike', limit=100):
-        # TODO vk: lock for arg - module not installed
-        args = args or []
-        if name:
-            recs = self.search(
-                args + [('ean_128', operator, name)], limit=limit)
-            if recs:
-                return recs.name_get()
-        return super().name_search(
-            name=name, args=args, operator=operator, limit=limit)
+    def name_search(self, name, args=None, operator='ilike', limit=100):
+        # DONETODO vk: lock for arg - module not installed
+        if self.env.company.country_code == 'AR':
+            args = args or []
+            if name:
+                recs = self.search(
+                    args + [('ean_128', operator, name)], limit=limit)
+                if recs:
+                    return recs.name_get()
+            return super().name_search(name=name, args=args, operator=operator, limit=limit)
+        else:
+            return super().name_search(name=name, args=args, operator=operator, limit=limit)

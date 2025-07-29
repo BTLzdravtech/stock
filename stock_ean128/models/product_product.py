@@ -10,7 +10,6 @@ class ProductProduct(models.Model):
 
     @api.model
     def name_search(self, name, args=None, operator='ilike', limit=100):
-        # DONETODO vk: lock for arg - module not installed
         if self.env.company.country_code == 'AR':
             res = super().name_search(
                 name, args=args, operator=operator, limit=limit)

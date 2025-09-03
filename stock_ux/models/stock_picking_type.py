@@ -18,7 +18,7 @@ class StockPickingType(models.Model):
 
     block_picking_deletion = fields.Boolean(
         help="Do not allow to remove pickings",
-        default=True,
+        default=False,
     )
 
     block_manual_lines = fields.Boolean(

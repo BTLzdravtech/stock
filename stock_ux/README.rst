@@ -14,6 +14,7 @@
 Stock UX
 ========
 
+
 #. Add observations on pickings (and deliveryslip)
 #. Add a wizard action in the stock move lines of a picking to change locations for several lines at the same time with the 'Manage Multiple Stock Locations' permission.
 #. Show always visible (for an existing lots configuration in the type operation) the notebook pages in lot form view when create and edit a lot from a stock move line.
@@ -37,6 +38,7 @@ Stock UX
 #. Add an optional setting to print remaining quantities not yet delivered on Delivery Slips: "Show remaining quantities not yet delivered on Delivery Slips."print remaining quantities not yet delivered
 #. Adds a review toggle per line that allows the user to indicate when the replenishment order is ready to be confirmed.
 #. Add a "All transfers" view form in Menu: Operations
+#. Add a restriction to edit operation type for users with the "Restrict editing Operation Type in Pickings" check.
 
 Installation
 ============

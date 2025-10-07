@@ -3,21 +3,28 @@
 # 	* stock_ux
 # 
 # Translators:
-# Juan José Scarafía <scarafia.juanjose@gmail.com>, 2024
+# Matias Velazquez, 2025
+# Juan José Scarafía <scarafia.juanjose@gmail.com>, 2025
 # 
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 18.0+e\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-12-05 15:20+0000\n"
+"POT-Creation-Date: 2025-09-25 19:09+0000\n"
 "PO-Revision-Date: 2024-11-13 15:07+0000\n"
-"Last-Translator: Juan José Scarafía <scarafia.juanjose@gmail.com>, 2024\n"
+"Last-Translator: Juan José Scarafía <scarafia.juanjose@gmail.com>, 2025\n"
 "Language-Team: Spanish (https://app.transifex.com/adhoc/teams/46451/es/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Language: es\n"
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+#. module: stock_ux
+#: model:ir.actions.report,print_report_name:stock_ux.action_report_picking_ux
+msgid ""
+"'Picking Operations - %s - %s' % (object.partner_id.name or '', object.name)"
+msgstr ""
 
 #. module: stock_ux
 #: model_terms:ir.ui.view,arch_db:stock_ux.report_delivery_document
@@ -72,16 +79,6 @@ msgstr "Nº de archivos adjuntos"
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_picking_internal_search
 msgid "Backorders"
 msgstr "Pedidos Pendientes"
-
-#. module: stock_ux
-#. odoo-python
-#: code:addons/stock_ux/models/stock_picking.py:0
-msgid ""
-"Be careful about the number of packages you are trying to insert. It may "
-"cause an error when trying to render the 'Shipping Label' template"
-msgstr ""
-"Tenga cuidado con la cantidad de paquetes que intenta insertar. Puede causar"
-" un error al intentar renderizar la plantilla 'Etiqueta de despacho'"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_picking_type__block_picking_deletion
@@ -141,6 +138,16 @@ msgstr ""
 "transferencia."
 
 #. module: stock_ux
+#: model:ir.model,name:stock_ux.model_product_label_layout
+msgid "Choose the sheet layout to print the labels"
+msgstr "Elija el diseño de la hoja para imprimir etiquetas"
+
+#. module: stock_ux
+#: model:ir.actions.server,name:stock_ux.ir_cron_compute_rotation_ir_actions_server
+msgid "Compute Rotation"
+msgstr "Computar Rotación"
+
+#. module: stock_ux
 #: model:ir.model,name:stock_ux.model_res_config_settings
 msgid "Config Settings"
 msgstr "Ajustes de configuración"
@@ -152,11 +159,13 @@ msgstr "Confirmar"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_operation_wizard__create_uid
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__create_uid
 msgid "Created by"
 msgstr "Creado por"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_operation_wizard__create_date
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__create_date
 msgid "Created on"
 msgstr "Creado el"
 
@@ -168,16 +177,17 @@ msgstr "Plazo excedido y/o por lo programado"
 #. module: stock_ux
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_picking_form
 msgid "Descripción 2"
-msgstr ""
+msgstr "Description 2"
 
 #. module: stock_ux
-#: model_terms:ir.ui.view,arch_db:stock_ux.view_picking_form
+#: model_terms:ir.ui.view,arch_db:stock_ux.view_picking_form_inherited
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_stock_move_line_detailed_operation_tree
 msgid "Descripción de origen"
-msgstr ""
+msgstr "Origin Description"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_move_line__name
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__name
 msgid "Description"
 msgstr "Descripción"
 
@@ -211,6 +221,7 @@ msgstr ""
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_operation_wizard__display_name
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__display_name
 msgid "Display Name"
 msgstr "Mostrar Nombre"
 
@@ -279,17 +290,7 @@ msgid "En Comprobantes de Transferencia usar Descripción de Origen"
 msgstr ""
 
 #. module: stock_ux
-#: model:ir.actions.report,name:stock_ux.action_custom_label_transfer_template_view_pdf
-msgid "Etiqueta de despacho (PDF)"
-msgstr ""
-
-#. module: stock_ux
-#: model:ir.actions.report,name:stock_ux.action_custom_label_transfer_template_zpl
-msgid "Etiqueta de despacho (ZPL)"
-msgstr ""
-
-#. module: stock_ux
-#: model:ir.actions.report,name:stock_ux.action_custom_barcode_transfer_template_view_pdf
+#: model:ir.actions.report,name:stock_ux.action_custom_barcode_transfer_template_view_zpl
 msgid "Etiquetas de Productos del picking (ZPL)"
 msgstr ""
 
@@ -325,6 +326,7 @@ msgstr "Tiene Mensaje"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_operation_wizard__id
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__id
 msgid "ID"
 msgstr ""
 
@@ -366,17 +368,24 @@ msgid "Internal Notes"
 msgstr "Notas Internas"
 
 #. module: stock_ux
+#: model:ir.model,name:stock_ux.model_stock_location
+msgid "Inventory Locations"
+msgstr "Ubicaciones de inventario"
+
+#. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_warehouse_orderpoint__message_is_follower
 msgid "Is Follower"
 msgstr "Es un seguidor"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_operation_wizard__write_uid
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__write_uid
 msgid "Last Updated by"
 msgstr "Actualizado por"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_operation_wizard__write_date
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__write_date
 msgid "Last Updated on"
 msgstr "Actualizado el"
 
@@ -436,9 +445,29 @@ msgid "Minimum Inventory Rule"
 msgstr "Regla de inventario mínimo"
 
 #. module: stock_ux
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__move_id
+msgid "Move"
+msgstr "Movimiento"
+
+#. module: stock_ux
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__move_quantity
+msgid "Move Quantity"
+msgstr "Cantidad del Movimiento"
+
+#. module: stock_ux
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__move_uom_id
+msgid "Move Uom"
+msgstr "Unidad de Medida del Movimiento"
+
+#. module: stock_ux
 #. odoo-javascript
 #: code:addons/stock_ux/static/src/forecasted_buttons.xml:0
 msgid "Movements"
+msgstr "Movimientos"
+
+#. module: stock_ux
+#: model:ir.model.fields,field_description:stock_ux.field_product_label_layout__line_ids
+msgid "Moves"
 msgstr "Movimientos"
 
 #. module: stock_ux
@@ -462,6 +491,14 @@ msgid "Net Quantity Location"
 msgstr "Cantidad neta en ubicación"
 
 #. module: stock_ux
+#. odoo-python
+#: code:addons/stock_ux/models/stock_scrap.py:0
+msgid ""
+"No se puede desechar una cantidad mayor a la cantidad dentro de la "
+"transferencia del producto: %s."
+msgstr ""
+
+#. module: stock_ux
 #: model_terms:ir.actions.act_window,help:stock_ux.action_picking_tree_all
 msgid "No transfer found. Let's create one!"
 msgstr "No se encontró ningúna transferencia. Creemos una!"
@@ -474,7 +511,7 @@ msgstr "Número de acciones"
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_picking__number_of_packages
 msgid "Number of Packages"
-msgstr ""
+msgstr "Número de Paquetes"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_warehouse_orderpoint__message_has_error_counter
@@ -545,6 +582,11 @@ msgid "Picking Lists"
 msgstr "Listas de Recogida"
 
 #. module: stock_ux
+#: model:ir.actions.report,name:stock_ux.action_report_picking_ux
+msgid "Picking Operations"
+msgstr "Operaciones de Traslado"
+
+#. module: stock_ux
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_move_tree
 msgid "Picking Partner"
 msgstr "Contacto de Transferencia"
@@ -555,6 +597,11 @@ msgstr "Contacto de Transferencia"
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_move_search
 msgid "Picking Type"
 msgstr "Tipo de albarán"
+
+#. module: stock_ux
+#: model:ir.model.fields,field_description:stock_ux.field_stock_picking_zpl_lines__picking_zpl_id
+msgid "Picking Zpl"
+msgstr "ZPL de Traslado"
 
 #. module: stock_ux
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_picking_internal_search
@@ -582,6 +629,11 @@ msgid ""
 "origen (la descripción de origen suele ser la descripción de venta o la "
 "descripción de la compra)"
 msgstr ""
+
+#. module: stock_ux
+#: model:ir.model,name:stock_ux.model_stock_picking_zpl_lines
+msgid "Print Stock Voucher lines"
+msgstr "Imprimir las Líneas de Remito"
 
 #. module: stock_ux
 #: model:ir.model,name:stock_ux.model_product_template
@@ -648,6 +700,11 @@ msgid "Remaining parts of picking partially processed"
 msgstr "Partes restantes de la recogida parcialmente procesadas"
 
 #. module: stock_ux
+#: model:res.groups,name:stock_ux.group_restrict_edit_picking_type
+msgid "Restrict editing Operation Type in Pickings"
+msgstr ""
+
+#. module: stock_ux
 #: model:res.groups,name:stock_ux.group_restrict_to_modify_reservations_from_planned
 msgid "Restrict to modify reservations from planned"
 msgstr "No permitir modificar reservas desde previsto"
@@ -660,7 +717,7 @@ msgstr "Albarán de devolución"
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_warehouse_orderpoint__reviewed
 msgid "Reviewed"
-msgstr ""
+msgstr "Revisado"
 
 #. module: stock_ux
 #: model:ir.model.fields,field_description:stock_ux.field_stock_warehouse_orderpoint__rotation
@@ -681,6 +738,11 @@ msgstr "Error de entrega de SMS"
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_picking_internal_search
 msgid "Scheduled Date"
 msgstr "Fecha Programada"
+
+#. module: stock_ux
+#: model:ir.model,name:stock_ux.model_stock_scrap
+msgid "Scrap"
+msgstr "Desechar"
 
 #. module: stock_ux
 #: model:ir.actions.server,name:stock_ux.action_operation_set_all_undone
@@ -738,7 +800,7 @@ msgstr "Estado"
 #. module: stock_ux
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_picking_type_form
 msgid "Stock"
-msgstr ""
+msgstr "Stock"
 
 #. module: stock_ux
 #: model:ir.model,name:stock_ux.model_stock_move
@@ -749,6 +811,11 @@ msgstr "Movimiento de stock"
 #: model:ir.model,name:stock_ux.model_stock_operation_wizard
 msgid "Stock Operation Wizard"
 msgstr "Asistente de Operaciones de Stock"
+
+#. module: stock_ux
+#: model:ir.model,name:stock_ux.model_stock_forecasted_product_product
+msgid "Stock Replenishment Report"
+msgstr "Informe de reposición de stock"
 
 #. module: stock_ux
 #: model:ir.model,name:stock_ux.model_stock_rule
@@ -792,7 +859,7 @@ msgstr "Actividades de Hoy"
 #. module: stock_ux
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_move_line_tree2
 msgid "Total"
-msgstr ""
+msgstr "Total"
 
 #. module: stock_ux
 #: model:ir.model,name:stock_ux.model_stock_picking
@@ -917,15 +984,14 @@ msgstr ""
 #: code:addons/stock_ux/models/stock_picking.py:0
 msgid ""
 "You can not duplicate a Picking because \"Block Additional Quantity\" is "
-"enable on the picking type \"%s\""
+"enabled on the picking type \"%s\""
 msgstr ""
-"No puede duplicar la transferencia porque \"Bloquear cantidades "
-"adicionales\" está marcado en el tipo de operación \"%s\""
+"No puede duplicar el traslado ya que \"Bloquear Cantidades Adicionales\" se "
+"encuentra configurado en el tipo de traslado."
 
 #. module: stock_ux
 #. odoo-python
 #: code:addons/stock_ux/models/stock_move.py:0
-#: code:addons/stock_ux/models/stock_move_line.py:0
 msgid "You can not transfer more than the initial demand!"
 msgstr "No puede transferir más de la demanda inicial!"
 
@@ -933,6 +999,15 @@ msgstr "No puede transferir más de la demanda inicial!"
 #. odoo-python
 #: code:addons/stock_ux/models/stock_move_line.py:0
 msgid "You can't transfer more quantity than the quantity on stock!"
+msgstr "No puede transferir una cantidad mayor a la cantidad en stock!"
+
+#. module: stock_ux
+#. odoo-python
+#: code:addons/stock_ux/models/stock_picking.py:0
+msgid ""
+"You cannot change the Operation Type once it has been set. This action is "
+"restricted for your user. Please contact your Inventory Manager if you need "
+"to perform this operation."
 msgstr ""
 
 #. module: stock_ux
@@ -985,7 +1060,7 @@ msgstr ""
 #. module: stock_ux
 #: model_terms:ir.ui.view,arch_db:stock_ux.custom_barcode_transfer_template_view_zpl
 msgid ""
-"^FS \n"
+"^FS\n"
 "^XZ"
 msgstr ""
 
@@ -1015,3 +1090,8 @@ msgid ""
 "^FO260,10\n"
 "^A0N,20,25^FD"
 msgstr ""
+
+#. module: stock_ux
+#: model:ir.model.fields,field_description:stock_ux.field_product_label_layout__picking_id
+msgid "picking"
+msgstr "Traslado"

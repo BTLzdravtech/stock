@@ -14,7 +14,7 @@ class Location(models.Model):
 
     @api.onchange('replenish_location')
     def _onchange_replenish_location(self):
-        if self.replenish_location == False:
+        if self.company_id.country_code == 'AR' and self.replenish_location == False:
             warning = {
                 'title': ('Warning!'),
                 'message': (

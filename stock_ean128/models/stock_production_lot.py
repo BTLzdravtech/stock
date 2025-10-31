@@ -25,9 +25,10 @@ class StockLot(models.Model):
 
     @api.model
     def name_search(self, name, args=None, operator="ilike", limit=100):
-        args = args or []
-        if name:
-            recs = self.search(args + [("ean_128", operator, name)], limit=limit)
-            if recs:
-                return recs.name_get()
+        if self.env.company.country_code == 'AR':
+            args = args or []
+            if name:
+                recs = self.search(args + [("ean_128", operator, name)], limit=limit)
+                if recs:
+                    return recs.name_get()
         return super().name_search(name=name, args=args, operator=operator, limit=limit)

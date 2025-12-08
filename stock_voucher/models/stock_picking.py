@@ -105,11 +105,21 @@ class StockPicking(models.Model):
             if picking.picking_type_id.code == "outgoing":
                 if picking.picking_type_id.restrict_number_package and not picking.number_of_packages > 0:
                     raise UserError(_("The number of packages can not be 0"))
-            if picking.book_required and not picking.book_id and not picking.batch_id:
+            batch_exists = "batch_id" in picking._fields and picking.batch_id
+            if picking.book_required and not picking.book_id and not batch_exists:
                 raise UserError(_("You must select a Voucher Book"))
             elif not picking.location_id.usage == "customer" and picking.voucher_required and not picking.voucher_ids:
                 raise UserError(_("You must set stock voucher numbers"))
         return True
+
+    def action_put_in_pack(self, move_lines_to_pack=False):
+        """
+        We override to compute number of packages
+        """
+        res = super().action_put_in_pack(move_lines_to_pack=move_lines_to_pack)
+        if self.picking_type_id.number_of_packages:
+            self.number_of_packages = len(self.package_level_ids)
+        return res
 
     def button_validate(self):
         """
@@ -119,9 +129,6 @@ class StockPicking(models.Model):
         # active_id could not be the picking
         self = self.with_context(picking_ids=self.ids)
         self.do_stock_voucher_transfer_check()
-        # We compute number of packages according to package_level_ids
-        if self.picking_type_id.number_of_packages:
-            self.number_of_packages = len(self.package_level_ids)
 
         res = super().button_validate()
         # res none when no wizard opended
@@ -193,8 +200,9 @@ class StockPicking(models.Model):
                                     bom_quantity += line_data["qty"]
                             if not bom_quantity:
                                 continue
+                            rec_move = rec.move_ids.filtered(lambda m: m._origin.id == move.id)
                             picking_avg.append(move.product_uom_qty / bom_quantity)
-                            done_avg.append(move.quantity / bom_quantity)
+                            done_avg.append(rec_move.quantity / bom_quantity)
                         picking_value += so_bom_line.price_reduce_taxexcl * (sum(picking_avg) / len(picking_avg))
                         done_value += so_bom_line.price_reduce_taxexcl * (sum(done_avg) / len(done_avg))
 

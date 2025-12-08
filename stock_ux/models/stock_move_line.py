@@ -36,6 +36,7 @@ class StockMoveLine(models.Model):
 
     @api.depends_context("location")
     def _compute_product_uom_qty_location(self):
+        # TODO: Odoo BTL - lock for AR
         location = self._context.get("location")
         if not location:
             self.update({"product_uom_qty_location": 0.0})
@@ -56,6 +57,7 @@ class StockMoveLine(models.Model):
 
     @api.constrains("quantity")
     def _check_manual_lines(self):
+        # TODO: Odoo BTL - lock for AR
         if self._context.get("put_in_pack", False):
             return
         invalid_lines = self.filtered(
@@ -109,6 +111,7 @@ class StockMoveLine(models.Model):
         """This is to solve a bug when create the sml (the value is not completed after creation)
         and should be reported to odoo to solve."""
         recs = super().create(vals_list)
+        # TODO: Odoo BTL - lock for AR
         for rec in recs:
             if rec.picking_id and not rec.description_picking:
                 product = rec.product_id.with_context(lang=rec.picking_id.partner_id.lang or rec.env.user.lang)

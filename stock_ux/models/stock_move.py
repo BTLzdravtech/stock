@@ -53,6 +53,7 @@ class StockMove(models.Model):
 
     @api.constrains("quantity")
     def _check_quantity(self):
+        # TODO: Odoo BTL - lock for AR
         precision = self.env["decimal.precision"].precision_get("Product Unit of Measure")
         if any(self.filtered(lambda x: x.scrapped)):
             return
@@ -97,6 +98,7 @@ class StockMove(models.Model):
     def default_get(self, fields_list):
         # We override the default_get to make stock moves created when the picking
         # was confirmed , this way restrict to add more quantity that initial demand
+        # TODO: Odoo BTL - lock for AR
         defaults = super().default_get(fields_list)
         if self.env.context.get("default_picking_id"):
             picking_id = self.env["stock.picking"].browse(self.env.context["default_picking_id"])
@@ -108,6 +110,7 @@ class StockMove(models.Model):
 
     @api.constrains("state")
     def check_cancel(self):
+        # TODO: Odoo BTL - lock for AR
         if self._context.get("cancel_from_order") or self.env.is_superuser():
             return
         if self.filtered(
@@ -143,6 +146,7 @@ class StockMove(models.Model):
 
     @api.depends("state", "picking_id")
     def _compute_is_initial_demand_editable(self):
+        # TODO: Odoo BTL - lock for AR
         super(StockMove, self)._compute_is_initial_demand_editable()
         for move in self:
             if move.picking_id.picking_type_id.block_additional_quantity and move.picking_id.state != "draft":
@@ -152,6 +156,7 @@ class StockMove(models.Model):
         """To avoid to check_quantity_available when an assing in move is trigger we
         send a context that checks if the assign comes from this method
         """
+        # TODO: Odoo BTL - lock for AR
         if not self.env.context.get("trigger_assign"):
             return super().with_context(trigger_assign=True)._trigger_assign()
         return super()._trigger_assign()

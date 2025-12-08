@@ -27,6 +27,7 @@ class StockRule(models.Model):
         # Extract orderpoints from procurements and recompute their qty_to_order_computed
         # procurement is a namedtuple:
         # (product_id, product_qty, product_uom, location_id, name, origin, company_id, values)
+        # TODO: Odoo BTL - lock for AR
         orderpoints = self.env["stock.warehouse.orderpoint"]
         for procurement, rule in procurements:
             # Access values dict from the namedtuple (index 7 or .values attribute)

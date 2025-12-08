@@ -131,6 +131,7 @@ class StockWarehouseOrderpoint(models.Model):
         """When archive a replenishment rule
         set min, max and multiple quantities in 0.
         """
+        # TODO: Odoo BTL - lock for AR
         if "active" in vals and not vals["active"]:
             self.write(
                 {
@@ -181,6 +182,7 @@ class StockWarehouseOrderpoint(models.Model):
 
     def _cron_compute_rotation(self):
         """Cron method to compute the rotation of orderpoints."""
+        # TODO: Odoo BTL - lock for AR
         orderpoints = self.with_context(active_test=False).search([])
         orderpoints._compute_rotation()
         return True

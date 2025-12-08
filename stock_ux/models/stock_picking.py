@@ -28,6 +28,7 @@ class StockPicking(models.Model):
         To avoid errors we block deletion of pickings in other state than
         draft or cancel
         """
+        # TODO: Odoo BTL - lock for AR
         not_del_pickings = self.filtered(
             lambda x: x.picking_type_id.block_picking_deletion or x.state not in ("draft", "cancel")
         )
@@ -44,6 +45,7 @@ class StockPicking(models.Model):
         return super().unlink()
 
     def copy(self, default=None):
+        # TODO: Odoo BTL - lock for AR
         for picking in self:
             if not default and picking.picking_type_id.block_additional_quantity:
                 raise UserError(
@@ -56,17 +58,20 @@ class StockPicking(models.Model):
 
     @api.onchange("location_id")
     def change_location(self):
+        # TODO: Odoo BTL - lock for AR
         # we only change moves locations if picking in draft
         if self.state == "draft":
             self.move_ids.update({"location_id": self.location_id.id})
 
     @api.onchange("location_dest_id")
     def change_location_dest(self):
+        # TODO: Odoo BTL - lock for AR
         # we only change moves locations if picking in draft
         if self.state == "draft":
             self.move_ids.update({"location_dest_id": self.location_dest_id.id})
 
     def _send_confirmation_email(self):
+        # TODO: Odoo BTL - lock for AR
         for rec in self:
             if rec.picking_type_id.mail_template_id:
                 try:
@@ -90,6 +95,7 @@ class StockPicking(models.Model):
                 super(StockPicking, self)._send_confirmation_email()
 
     def _action_done(self):
+        # TODO: Odoo BTL - lock for AR
         for rec in self.with_context(
             mail_notify_force_send=False,
             email_notification_force_header=True,
@@ -155,6 +161,7 @@ class StockPicking(models.Model):
 
         if "picking_type_id" in vals:
             user = self.env.user
+            # TODO: Odoo BTL - lock for AR
             if user.has_group("stock_ux.group_restrict_edit_picking_type"):
                 for picking in self:
                     if picking.picking_type_id:

@@ -36,53 +36,53 @@ class StockMoveLine(models.Model):
 
     @api.depends_context("location")
     def _compute_product_uom_qty_location(self):
-        # TODO: Odoo BTL - lock for AR
-        location = self._context.get("location")
-        if not location:
-            self.update({"product_uom_qty_location": 0.0})
-            return False
-        # because now we use location_id to select location, we have compelte
-        # location name. If y need we can use some code of
-        # _get_domain_locations on stock/product.py
-        location_name = location[0]
-        if isinstance(location[0], int):
-            location_name = self.env["stock.location"].browse(location[0]).name
-        locations = self.env["stock.location"].search([("complete_name", "ilike", location_name)])
         for rec in self:
-            product_uom_qty_location = rec.quantity
-            if rec.location_id in locations:
-                # if location is source and destiny, then 0
-                product_uom_qty_location = 0.0 if rec.location_dest_id in locations else -rec.quantity
-            rec.product_uom_qty_location = product_uom_qty_location
+            rec.product_uom_qty_location = 0.0
+        if self.env.company.country_code == 'AR':
+            location = self._context.get("location")
+            if not location:
+                self.update({"product_uom_qty_location": 0.0})
+                return False
+            # because now we use location_id to select location, we have compelte
+            # location name. If y need we can use some code of
+            # _get_domain_locations on stock/product.py
+            location_name = location[0]
+            if isinstance(location[0], int):
+                location_name = self.env["stock.location"].browse(location[0]).name
+            locations = self.env["stock.location"].search([("complete_name", "ilike", location_name)])
+            for rec in self:
+                product_uom_qty_location = rec.quantity
+                if rec.location_id in locations:
+                    # if location is source and destiny, then 0
+                    product_uom_qty_location = 0.0 if rec.location_dest_id in locations else -rec.quantity
+                rec.product_uom_qty_location = product_uom_qty_location
 
     @api.constrains("quantity")
     def _check_manual_lines(self):
-        # TODO: Odoo BTL - lock for AR
-        if self._context.get("put_in_pack", False):
-            return
-        invalid_lines = self.filtered(
-            lambda x: not x.location_id.should_bypass_reservation()
-            and x.picking_id.picking_type_id.block_manual_lines
-            and x._check_quantity_available() < 0
-        )
-        if not invalid_lines:
-            return
-
-        # Si lo ejecuta el superusuario (odoobot), revertir el cambio y loguear
-        if self.env.is_superuser():
-            for line in invalid_lines:
-                # Revertir el cambio de quantity
-                line.quantity = max(0, line._check_quantity_available() + line.quantity)
-                if line.picking_id:
-                    line.picking_id.message_post(
-                        body=_(
-                            "Se intentó transferir una cantidad mayor al stock disponible en la línea %s durante la ejecución automática (odoobot/scheduler). El sistema ignoró el cambio y mantuvo la cantidad original."
+        if self.env.company.country_code == 'AR':
+            if self._context.get("put_in_pack", False):
+                return
+            invalid_lines = self.filtered(
+                lambda x: not x.location_id.should_bypass_reservation()
+                and x.picking_id.picking_type_id.block_manual_lines
+                and x._check_quantity_available() < 0
+            )
+            if not invalid_lines:
+                return
+            # Si lo ejecuta el superusuario (odoobot), revertir el cambio y loguear
+            if self.env.is_superuser():
+                for line in invalid_lines:
+                    # Revertir el cambio de quantity
+                    line.quantity = max(0, line._check_quantity_available() + line.quantity)
+                    if line.picking_id:
+                        line.picking_id.message_post(
+                            body=_(
+                                "Se intentó transferir una cantidad mayor al stock disponible en la línea %s durante la ejecución automática (odoobot/scheduler). El sistema ignoró el cambio y mantuvo la cantidad original."
+                            )
+                            % line.display_name
                         )
-                        % line.display_name
-                    )
-            return
-
-        raise ValidationError(_("You can't transfer more quantity than the quantity on stock!"))
+                return
+            raise ValidationError(_("You can't transfer more quantity than the quantity on stock!"))
 
     def _check_quantity_available(self):
         self.ensure_one()
@@ -111,11 +111,11 @@ class StockMoveLine(models.Model):
         """This is to solve a bug when create the sml (the value is not completed after creation)
         and should be reported to odoo to solve."""
         recs = super().create(vals_list)
-        # TODO: Odoo BTL - lock for AR
-        for rec in recs:
-            if rec.picking_id and not rec.description_picking:
-                product = rec.product_id.with_context(lang=rec.picking_id.partner_id.lang or rec.env.user.lang)
-                rec.description_picking = product._get_description(rec.picking_id.picking_type_id)
+        if self.env.company.country_code == 'AR':
+            for rec in recs:
+                if rec.picking_id and not rec.description_picking:
+                    product = rec.product_id.with_context(lang=rec.picking_id.partner_id.lang or rec.env.user.lang)
+                    rec.description_picking = product._get_description(rec.picking_id.picking_type_id)
         return recs
 
     def _get_aggregated_product_quantities(self, **kwargs):

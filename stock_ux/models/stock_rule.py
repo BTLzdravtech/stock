@@ -24,18 +24,18 @@ class StockRule(models.Model):
         """
         result = super()._run_pull(procurements)
 
-        # Extract orderpoints from procurements and recompute their qty_to_order_computed
-        # procurement is a namedtuple:
-        # (product_id, product_qty, product_uom, location_id, name, origin, company_id, values)
-        orderpoints = self.env["stock.warehouse.orderpoint"]
-        for procurement, rule in procurements:
-            # Access values dict from the namedtuple (index 7 or .values attribute)
-            values = procurement.values
-            if values.get("orderpoint_id"):
-                orderpoints |= values["orderpoint_id"]
+        if self.env.company.country_code == 'AR':
+            # Extract orderpoints from procurements and recompute their qty_to_order_computed
+            # procurement is a namedtuple:
+            # (product_id, product_qty, product_uom, location_id, name, origin, company_id, values)
+            orderpoints = self.env["stock.warehouse.orderpoint"]
+            for procurement, rule in procurements:
+                # Access values dict from the namedtuple (index 7 or .values attribute)
+                values = procurement.values
+                if values.get("orderpoint_id"):
+                    orderpoints |= values["orderpoint_id"]
 
-        # Recompute only the affected orderpoints for performance
-        if orderpoints:
-            orderpoints.sudo()._compute_qty_to_order_computed()
-
+            # Recompute only the affected orderpoints for performance
+            if orderpoints:
+                orderpoints.sudo()._compute_qty_to_order_computed()
         return result

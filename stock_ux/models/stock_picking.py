@@ -28,52 +28,83 @@ class StockPicking(models.Model):
         To avoid errors we block deletion of pickings in other state than
         draft or cancel
         """
-        not_del_pickings = self.filtered(
-            lambda x: x.picking_type_id.block_picking_deletion or x.state not in ("draft", "cancel")
-        )
-        if not_del_pickings:
-            raise ValidationError(
-                _(
-                    'You can not delete this pickings because "Block picking '
-                    'deletion" is enable on the picking type/s "%s" '
-                    "or the state of the picking is not draft or cancel.\n"
-                    "Picking Ids: %s"
-                )
-                % (",".join(not_del_pickings.mapped("picking_type_id.name")), not_del_pickings.ids)
+        if self.env.company.country_code == 'AR':
+            not_del_pickings = self.filtered(
+                lambda x: x.picking_type_id.block_picking_deletion or x.state not in ("draft", "cancel")
             )
+            if not_del_pickings:
+                raise ValidationError(
+                    _(
+                        'You can not delete this pickings because "Block picking '
+                        'deletion" is enable on the picking type/s "%s" '
+                        "or the state of the picking is not draft or cancel.\n"
+                        "Picking Ids: %s"
+                    )
+                    % (",".join(not_del_pickings.mapped("picking_type_id.name")), not_del_pickings.ids)
+                )
         return super().unlink()
 
     def copy(self, default=None):
-        for picking in self:
-            if not default and picking.picking_type_id.block_additional_quantity:
-                raise UserError(
-                    _(
-                        'You can not duplicate a Picking because "Block Additional Quantity" is enabled on the picking type "%(name)s"'
+        if self.env.company.country_code == 'AR':
+            for picking in self:
+                if not default and picking.picking_type_id.block_additional_quantity:
+                    raise UserError(
+                        _(
+                            'You can not duplicate a Picking because "Block Additional Quantity" is enabled on the picking type "%(name)s"'
+                        )
+                        % {"name": picking.picking_type_id.name}
                     )
-                    % {"name": picking.picking_type_id.name}
-                )
         return super().copy(default=default)
 
     @api.onchange("location_id")
     def change_location(self):
-        # we only change moves locations if picking in draft
-        if self.state == "draft":
-            self.move_ids.update({"location_id": self.location_id.id})
+        if self.env.company.country_code == 'AR':
+            # we only change moves locations if picking in draft
+            if self.state == "draft":
+                self.move_ids.update({"location_id": self.location_id.id})
 
     @api.onchange("location_dest_id")
     def change_location_dest(self):
-        # we only change moves locations if picking in draft
-        if self.state == "draft":
-            self.move_ids.update({"location_dest_id": self.location_dest_id.id})
+        if self.env.company.country_code == 'AR':
+            # we only change moves locations if picking in draft
+            if self.state == "draft":
+                self.move_ids.update({"location_dest_id": self.location_dest_id.id})
 
     def _send_confirmation_email(self):
-        for rec in self:
-            if rec.picking_type_id.mail_template_id:
+        if self.env.company.country_code == 'AR':
+            for rec in self:
+                if rec.picking_type_id.mail_template_id:
+                    try:
+                        rec.with_context(
+                            email_notification_force_header=True,
+                            email_notification_force_footer=True,
+                        ).message_post_with_source(rec.picking_type_id.mail_template_id)
+                    except Exception as error:
+                        title = _("ERROR: Picking was not sent via email")
+                        rec.message_post(
+                            body="<br/><br/>".join(
+                                [
+                                    "<b>" + title + "</b>",
+                                    _("Please check the email template associated with the picking type."),
+                                    "<code>" + str(error) + "</code>",
+                                ]
+                            ),
+                            body_is_html=True,
+                        )
+                else:
+                    super(StockPicking, self)._send_confirmation_email()
+        else:
+            super(StockPicking, self)._send_confirmation_email()
+
+    def _action_done(self):
+        if self.env.company.country_code == 'AR':
+            for rec in self.with_context(
+                mail_notify_force_send=False,
+                email_notification_force_header=True,
+                email_notification_force_footer=True,
+            ).filtered("picking_type_id.mail_template_id"):
                 try:
-                    rec.with_context(
-                        email_notification_force_header=True,
-                        email_notification_force_footer=True,
-                    ).message_post_with_source(rec.picking_type_id.mail_template_id)
+                    rec.message_post_with_template(rec.picking_type_id.mail_template_id.id)
                 except Exception as error:
                     title = _("ERROR: Picking was not sent via email")
                     rec.message_post(
@@ -84,30 +115,7 @@ class StockPicking(models.Model):
                                 "<code>" + str(error) + "</code>",
                             ]
                         ),
-                        body_is_html=True,
                     )
-            else:
-                super(StockPicking, self)._send_confirmation_email()
-
-    def _action_done(self):
-        for rec in self.with_context(
-            mail_notify_force_send=False,
-            email_notification_force_header=True,
-            email_notification_force_footer=True,
-        ).filtered("picking_type_id.mail_template_id"):
-            try:
-                rec.message_post_with_template(rec.picking_type_id.mail_template_id.id)
-            except Exception as error:
-                title = _("ERROR: Picking was not sent via email")
-                rec.message_post(
-                    body="<br/><br/>".join(
-                        [
-                            "<b>" + title + "</b>",
-                            _("Please check the email template associated with the picking type."),
-                            "<code>" + str(error) + "</code>",
-                        ]
-                    ),
-                )
         return super()._action_done()
 
     def new_force_availability(self):
@@ -153,16 +161,17 @@ class StockPicking(models.Model):
         :return: Result of the superclass write method.
         """
 
-        if "picking_type_id" in vals:
-            user = self.env.user
-            if user.has_group("stock_ux.group_restrict_edit_picking_type"):
-                for picking in self:
-                    if picking.picking_type_id:
-                        raise UserError(
-                            _(
-                                "You cannot change the Operation Type once it has been set. "
-                                "This action is restricted for your user. "
-                                "Please contact your Inventory Manager if you need to perform this operation."
+        if self.env.company.country_code == 'AR':
+            if "picking_type_id" in vals:
+                user = self.env.user
+                if user.has_group("stock_ux.group_restrict_edit_picking_type"):
+                    for picking in self:
+                        if picking.picking_type_id:
+                            raise UserError(
+                                _(
+                                    "You cannot change the Operation Type once it has been set. "
+                                    "This action is restricted for your user. "
+                                    "Please contact your Inventory Manager if you need to perform this operation."
+                                )
                             )
-                        )
         return super().write(vals)

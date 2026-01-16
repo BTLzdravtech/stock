@@ -131,14 +131,15 @@ class StockWarehouseOrderpoint(models.Model):
         """When archive a replenishment rule
         set min, max and multiple quantities in 0.
         """
-        if "active" in vals and not vals["active"]:
-            self.write(
-                {
-                    "product_min_qty": 0.0,
-                    "product_max_qty": 0.0,
-                    "qty_multiple": 0.0,
-                }
-            )
+        if self.env.company.country_code == 'AR':
+            if "active" in vals and not vals["active"]:
+                self.write(
+                    {
+                        "product_min_qty": 0.0,
+                        "product_max_qty": 0.0,
+                        "qty_multiple": 0.0,
+                    }
+                )
         return super().write(vals)
 
     def _get_orderpoint_action(self):
@@ -181,6 +182,7 @@ class StockWarehouseOrderpoint(models.Model):
 
     def _cron_compute_rotation(self):
         """Cron method to compute the rotation of orderpoints."""
-        orderpoints = self.with_context(active_test=False).search([])
-        orderpoints._compute_rotation()
-        return True
+        if self.env.company.country_code == 'AR':
+            orderpoints = self.with_context(active_test=False).search([])
+            orderpoints._compute_rotation()
+            return True

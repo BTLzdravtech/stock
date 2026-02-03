@@ -112,9 +112,10 @@
         <field name="sequence" eval="1"/>
     </record>
 
-    <record id="stock.action_stock_move_pivot_all" model="ir.actions.act_window.view">
+<!--    <record id="stock.action_stock_move_pivot_all" model="ir.actions.act_window.view">
         <field name="sequence" eval="10"/>
-    </record>
+    </record>-->
+<!--    I don’t see the purpose of this, so I’m just commenting it out.-->
 
     <record id="view_picking_form_inherited" model="ir.ui.view">
         <field name="name">stock.picking.form</field>

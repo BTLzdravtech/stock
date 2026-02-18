@@ -8,7 +8,7 @@ class IRActionsClient(models.Model):
     def read(self, fields=None, load='_classic_read'):
         res = super().read(fields=fields, load=load)
         company = self.env.company
-        if company and company.country_code:
+        if company and company.country_code and company.country_code == "AR":
             for i, action in enumerate(res):
                 ctx = safe_eval(action.get("context") or "{}")
                 ctx["company_country_code"] = company.country_code

@@ -108,15 +108,6 @@
     <menuitem id="all_picking" name="Todas las transferencias" parent="stock.menu_stock_transfers" sequence="1" action="action_picking_tree_all" groups="stock.group_stock_manager,stock.group_stock_user"/>
 
 
-    <record id="stock.action_stock_move_tree_all" model="ir.actions.act_window.view">
-        <field name="sequence" eval="1"/>
-    </record>
-
-<!--    <record id="stock.action_stock_move_pivot_all" model="ir.actions.act_window.view">
-        <field name="sequence" eval="10"/>
-    </record>-->
-<!--    I don’t see the purpose of this, so I’m just commenting it out.-->
-
     <record id="view_picking_form_inherited" model="ir.ui.view">
         <field name="name">stock.picking.form</field>
         <field name="model">stock.picking</field>

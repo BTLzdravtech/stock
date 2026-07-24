@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (C) 2015  ADHOC SA  (http://www.adhoc.com.ar)
+#    Copyright (C) 2026  ADHOC SA  (http://www.adhoc.com.ar)
 #    All Rights Reserved.
 #
 #    This program is free software: you can redistribute it and/or modify
@@ -18,19 +18,24 @@
 #
 ##############################################################################
 {
-    "name": "Stock Picking Returned Quantity",
+    "name": "Stock Delivery Zone",
     "version": "18.0.1.0.0",
     "category": "Warehouse Management",
-    "sequence": 14,
-    "summary": "",
+    "summary": "Assign delivery zones to contacts and show them on transfers",
     "author": "ADHOC SA",
     "website": "www.adhoc.com.ar",
     "license": "AGPL-3",
-    "images": [],
     "depends": [
+        "contacts",
         "stock_ux",
     ],
-    "data": [],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/stock_delivery_zone_views.xml",
+        "views/res_partner_views.xml",
+        "views/stock_picking_views.xml",
+        "report/stock_picking_reports.xml",
+    ],
     "demo": [],
     "installable": True,
     "auto_install": False,

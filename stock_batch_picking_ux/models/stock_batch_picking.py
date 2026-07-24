@@ -16,7 +16,7 @@ class StockPickingBatch(models.Model):
         # maneje en la vista para que si esta seteado pase dominio
         # y si no esta seteado no
         # required=True,
-        help="If you choose a partner then only pickings of this partner will" "be sellectable",
+        help="If you choose a partner then only pickings of this partner will be sellectable",
     )
     voucher_number = fields.Char()
     voucher_required = fields.Boolean(
@@ -93,17 +93,33 @@ class StockPickingBatch(models.Model):
                 vals["voucher_number"] = voucher_number
         return super().write(vals)
 
+    def action_confirm(self):
+        batches_in_draft = self.filtered(lambda batch: batch.state == "draft")
+        res = super().action_confirm()
+        # When the batch is confirmed for the first time, Odoo already created
+        # the operation lines from the selected pickings. For receptions we reset
+        # them to zero so the operator can input only the quantities physically
+        # received (partial reception). This must NOT touch deliveries/waves,
+        # where zeroing the quantity wrongly removes product availability.
+        batches_in_draft.move_line_ids.filtered(
+            lambda line: line.state not in ("done", "cancel") and line.picking_id.picking_type_id.code == "incoming"
+        ).write({"quantity": 0})
+        return res
+
     def add_picking_operation(self):
         self.ensure_one()
-        view_id = self.env.ref("stock_ux.view_move_line_tree").id
-        search_view_id = self.env.ref("stock_ux.stock_move_line_view_search").id
+        view_id = self.env.ref("stock_batch_picking_ux.view_move_line_tree_smart_button").id
+        search_view_id = self.env.ref("stock_batch_picking_ux.stock_move_line_view_search").id
         return {
             "type": "ir.actions.act_window",
             "res_model": "stock.move.line",
             "search_view_id": search_view_id,
             "views": [[view_id, "list"], [False, "form"]],
             "domain": [["id", "in", self.move_line_ids.ids]],
-            "context": {"create": False, "from_batch": True},
+            "context": {
+                "create": False,
+                "from_batch": True,
+            },
         }
 
     def action_done(self):
@@ -112,10 +128,23 @@ class StockPickingBatch(models.Model):
             # al agregar la restriccion de que al menos una tenga que tener
             # cantidad entonces nunca se manda el force_qty al picking
             if all(operation.quantity == 0 for operation in rec.move_line_ids):
-                raise UserError(_("Debe definir Cantidad Realizada en al menos una " "operación."))
+                raise UserError(_("Debe definir Cantidad Realizada en al menos una operación."))
 
             if rec.restrict_number_package and not rec.number_of_packages > 0:
                 raise UserError(_("The number of packages can not be 0"))
+
+            if rec.picking_type_id.book_required:
+                if rec.picking_type_id.book_id:
+                    pickings_without_book = rec.picking_ids.filtered(lambda p: not p.book_id)
+                    pickings_without_book.book_id = rec.picking_type_id.book_id
+                else:
+                    pickings_without_book = rec.picking_ids.filtered(lambda p: not p.book_id)
+                    if pickings_without_book:
+                        raise UserError(
+                            _("Please complete the vouchers book for the following pickings: %s")
+                            % ", ".join(pickings_without_book.mapped("name"))
+                        )
+
             if rec.number_of_packages:
                 rec.picking_ids.write({"number_of_packages": rec.number_of_packages})
 
@@ -133,6 +162,20 @@ class StockPickingBatch(models.Model):
                             "name": rec.voucher_number,
                         }
                     )
+            else:
+                batch_voucher_installed = "stock_batch_picking_voucher" in self.env["ir.module.module"].search(
+                    [("name", "=", "stock_batch_picking_voucher"), ("state", "=", "installed")]
+                ).mapped("name")
+                if not batch_voucher_installed:
+                    for picking in rec.picking_ids:
+                        if not picking.picking_type_id.auto_print_delivery_slip:
+                            continue
+                        book = picking.book_id or picking.picking_type_id.book_id
+                        if not book:
+                            continue
+                        if all(operation.quantity == 0 for operation in picking.move_line_ids):
+                            continue
+                        picking.assign_numbers(picking.get_estimated_number_of_pages(), book)
         return super(StockPickingBatch, self.with_context(do_not_assign_numbers=True)).action_done()
 
     def action_view_stock_picking(self):

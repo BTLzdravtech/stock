@@ -5,6 +5,7 @@
 ##############################################################################
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
+from odoo.tools.float_utils import float_compare
 
 
 class StockPicking(models.Model):
@@ -39,7 +40,10 @@ class StockPicking(models.Model):
                     "or the state of the picking is not draft or cancel.\n"
                     "Picking Ids: %s"
                 )
-                % (",".join(not_del_pickings.mapped("picking_type_id.name")), not_del_pickings.ids)
+                % (
+                    ",".join(not_del_pickings.mapped("picking_type_id.name")),
+                    not_del_pickings.ids,
+                )
             )
         return super().unlink()
 
@@ -68,6 +72,10 @@ class StockPicking(models.Model):
 
     def _send_confirmation_email(self):
         for rec in self:
+            # If stock_voucher is installed, skip email sending when validating the picking
+            if "book_required" in rec._fields and not rec._context.get("from_assign_numbers"):
+                continue
+
             if rec.picking_type_id.mail_template_id:
                 try:
                     rec.with_context(
@@ -88,27 +96,6 @@ class StockPicking(models.Model):
                     )
             else:
                 super(StockPicking, self)._send_confirmation_email()
-
-    def _action_done(self):
-        for rec in self.with_context(
-            mail_notify_force_send=False,
-            email_notification_force_header=True,
-            email_notification_force_footer=True,
-        ).filtered("picking_type_id.mail_template_id"):
-            try:
-                rec.message_post_with_template(rec.picking_type_id.mail_template_id.id)
-            except Exception as error:
-                title = _("ERROR: Picking was not sent via email")
-                rec.message_post(
-                    body="<br/><br/>".join(
-                        [
-                            "<b>" + title + "</b>",
-                            _("Please check the email template associated with the picking type."),
-                            "<code>" + str(error) + "</code>",
-                        ]
-                    ),
-                )
-        return super()._action_done()
 
     def new_force_availability(self):
         self.action_assign()
@@ -166,3 +153,24 @@ class StockPicking(models.Model):
                             )
                         )
         return super().write(vals)
+
+    def button_validate(self):
+        """Valida que no se transfiera más de la demanda inicial."""
+        for picking in self:
+            if picking.picking_type_id.block_additional_quantity:
+                precision = self.env["decimal.precision"].precision_get("Product Unit of Measure")
+                for move in picking.move_ids.filtered(lambda m: m.state not in ("draft", "cancel")):
+                    if float_compare(move.quantity, move.product_uom_qty, precision_digits=precision) == 1:
+                        raise UserError(
+                            _(
+                                "Cannot transfer more than initial demand!\n\n"
+                                "Product: %(product)s\n"
+                                "Initial Demand: %(demand)s\n"
+                                "Attempted Transfer: %(quantity)s\n\n"
+                                "Please update the source document (Purchase/Sales Order) to increase quantities.",
+                                product=move.product_id.display_name,
+                                demand=move.product_uom_qty,
+                                quantity=move.quantity,
+                            )
+                        )
+        return super().button_validate()

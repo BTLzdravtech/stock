@@ -54,14 +54,18 @@ class StockMoveLine(models.Model):
                 product_uom_qty_location = 0.0 if rec.location_dest_id in locations else -rec.quantity
             rec.product_uom_qty_location = product_uom_qty_location
 
-    @api.constrains("quantity")
     def _check_manual_lines(self):
+        # Si tenemos este contexto es porque si o si viene de una compra
+        if "previous_product_qty" in self.env.context:
+            return
         if self._context.get("put_in_pack", False):
             return
         invalid_lines = self.filtered(
-            lambda x: not x.location_id.should_bypass_reservation()
-            and x.picking_id.picking_type_id.block_manual_lines
-            and x._check_quantity_available() < 0
+            lambda x: (
+                not x.location_id.should_bypass_reservation()
+                and x.picking_id.picking_type_id.block_manual_lines
+                and x._check_quantity_available() < 0
+            )
         )
         if not invalid_lines:
             return
@@ -101,7 +105,7 @@ class StockMoveLine(models.Model):
             quants = self.env["stock.quant"].search(
                 [("product_id", "=", self.product_id.id), ("location_id", "in", locations.ids)]
             )
-            total_available = sum(quants.mapped("available_quantity")) - self.quantity
+            total_available = sum(quants.mapped("available_quantity"))
         return total_available
 
     @api.model_create_multi
@@ -113,6 +117,7 @@ class StockMoveLine(models.Model):
             if rec.picking_id and not rec.description_picking:
                 product = rec.product_id.with_context(lang=rec.picking_id.partner_id.lang or rec.env.user.lang)
                 rec.description_picking = product._get_description(rec.picking_id.picking_type_id)
+        recs._check_manual_lines()
         return recs
 
     def _get_aggregated_product_quantities(self, **kwargs):
@@ -124,7 +129,7 @@ class StockMoveLine(models.Model):
             move_line_by_move = {}
             for sml in self:
                 move = sml.move_id
-                if move and move.origin_description:
+                if move and move.origin_description and sml.picking_id.origin:
                     move_line_by_move.setdefault(
                         move.id, {"description": move.origin_description, "product_id": sml.product_id.id}
                     )
@@ -152,7 +157,8 @@ class StockMoveLine(models.Model):
         use_origin = (
             self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_use_origin", "False") == "True"
         )
-        if use_origin:
+        picking = move_line.picking_id if move_line else (move.picking_id if move else False)
+        if use_origin and picking and picking.origin:
             move = move or move_line.move_id
             uom = move.product_uom or move_line.product_uom_id
             name = move.product_id.display_name

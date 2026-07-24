@@ -4,7 +4,6 @@
 ##############################################################################
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import float_compare
 
 
 class StockMove(models.Model):
@@ -48,36 +47,10 @@ class StockMove(models.Model):
         for rec in self:
             if rec.sale_line_id:
                 rec.origin_description = rec.sale_line_id.name
-            else:
+            elif rec.picking_id.origin:
                 rec.origin_description = rec.product_id.name
-
-    @api.constrains("quantity")
-    def _check_quantity(self):
-        precision = self.env["decimal.precision"].precision_get("Product Unit of Measure")
-        if any(self.filtered(lambda x: x.scrapped)):
-            return
-        moves = self.filtered(
-            lambda x: x.picking_id.picking_type_id.block_additional_quantity
-            and float_compare(x.product_uom_qty, x.quantity, precision_digits=precision) == -1
-        )
-        if not moves:
-            return
-
-        # Si lo ejecuta el superusuario (scheduler), revertir el cambio y loguear
-        if self.env.is_superuser():
-            for move in moves:
-                # Revertir el cambio de quantity
-                move.quantity = move.product_uom_qty
-                move.picking_id.message_post(
-                    body=_(
-                        "Se intentó transferir una cantidad mayor a la demanda inicial en el movimiento %s durante la ejecución automática (scheduler). El sistema ignoró el cambio y mantuvo la cantidad original."
-                    )
-                    % move.display_name
-                )
-            return
-
-        # Comportamiento normal: raise si corresponde
-        raise ValidationError(_("You can not transfer more than the initial demand!"))
+            else:
+                rec.origin_description = rec.description_picking
 
     def action_view_linked_record(self):
         """This function returns an action that display existing sales order
@@ -111,15 +84,25 @@ class StockMove(models.Model):
         if self._context.get("cancel_from_order") or self.env.is_superuser():
             return
         if self.filtered(
-            lambda x: x.picking_id
-            and x.state == "cancel"
-            and not self.env.user.has_group("stock_ux.allow_picking_cancellation")
+            lambda x: (
+                x.picking_id
+                and x.state == "cancel"
+                and not self.env.user.has_group("stock_ux.allow_picking_cancellation")
+            )
         ):
             raise ValidationError("Only User with 'Picking cancelation allow' rights can cancel pickings")
 
     def _merge_moves(self, merge_into=False):
         # 22/04/2024: Agregamos esto porque sino al intentar confirmar compras con usuarios sin permisos, podia pasar que salga la constrain de arriba (check_cancel)
-        return super(StockMove, self.with_context(cancel_from_order=True))._merge_moves(merge_into=merge_into)
+        # Agregamos can_delete=True para permitir el unlink de moves duplicados durante el merge
+        return super(StockMove, self.with_context(cancel_from_order=True, can_delete=True))._merge_moves(
+            merge_into=merge_into
+        )
+
+    def action_explode(self):
+        # Cuando se explota un kit, MRP cancela y elimina el move original del producto kit,
+        # aunque tenga sale_line_id. Permitimos ese unlink con can_delete=True.
+        return super(StockMove, self.with_context(can_delete=True)).action_explode()
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -132,7 +115,7 @@ class StockMove(models.Model):
                 and sp.sale_id
                 and (sp.sale_id.state == "sale" or sp.sale_id.state == "done")
             ):
-                if vals.get("additional", False):
+                if vals.get("additional", False) and not vals.get("origin_returned_move_id"):
                     raise UserError(
                         "No se puede agregar productos adicionales ni modificar las cantidades demandadas:\n"
                         "- El pedido de venta se encuentra bloqueado.\n"
@@ -155,3 +138,71 @@ class StockMove(models.Model):
         if not self.env.context.get("trigger_assign"):
             return super().with_context(trigger_assign=True)._trigger_assign()
         return super()._trigger_assign()
+
+    def _action_assign(self, force_qty=False):
+        """Reservar / Comprobar disponibilidad crea líneas de reserva, no líneas
+        cargadas a mano, por lo que no debe dispararse el chequeo de
+        _check_manual_lines. El _trigger_assign automático ya lo evitaba, pero el
+        action_assign manual del picking no pasaba por ahí; marcamos el contexto
+        para saltear _check_quantity_available al crear las stock.move.line.
+        """
+        return super(StockMove, self.with_context(trigger_assign=True))._action_assign(force_qty=force_qty)
+
+    def _prepare_procurement_values(self):
+        values = super()._prepare_procurement_values()
+        physical_warehouse = self.location_id.warehouse_id
+        propagated_warehouse = values.get("warehouse_id")
+        is_subcontracting_move = (
+            "raw_material_production_id" in self._fields
+            and "subcontractor_id" in self.raw_material_production_id._fields
+            and bool(self.raw_material_production_id.subcontractor_id)
+        )
+
+        # In some multi-warehouse MTO chains the move keeps the commercial
+        # warehouse in `warehouse_id` even when the real source location belongs
+        # to another warehouse. If we propagate that stale warehouse to the next
+        # procurement, Odoo may reuse a draft RFQ from the wrong warehouse and
+        # end up mixing destinations across warehouses in the same PO.
+        # Scope the correction to MTO moves only so other procurement flows can
+        # keep their intentional warehouse propagation.
+        if (
+            self.procure_method == "make_to_order"
+            and not is_subcontracting_move
+            and physical_warehouse
+            and propagated_warehouse
+            and propagated_warehouse != physical_warehouse
+        ):
+            values["warehouse_id"] = physical_warehouse
+
+        return values
+
+    @api.ondelete(at_uninstall=False)
+    def _unlink_if_not_from_order(self):
+        """
+        Prevent deletion of moves linked to sale or purchase orders.
+        Only manual moves (not from orders) can be deleted.
+        Allow deletion when coming from internal Odoo processes (like merge_moves).
+        """
+        # Allow deletion when coming from internal processes
+        if self.env.context.get("can_delete"):
+            return
+
+        protected_moves = self.env["stock.move"]
+
+        # Check moves from sales (if sale_stock is installed)
+        if "sale_line_id" in self._fields:
+            protected_moves |= self.filtered(lambda m: m.sale_line_id)
+
+        # Check moves from purchases (if purchase_stock is installed)
+        if "purchase_line_id" in self._fields:
+            protected_moves |= self.filtered(lambda m: m.purchase_line_id)
+
+        if protected_moves:
+            raise UserError(
+                _(
+                    "Cannot delete stock moves linked to sale or purchase orders.\n"
+                    "Please modify quantities from the source order instead.\n\n"
+                    "Affected moves: %s"
+                )
+                % ", ".join(protected_moves.mapped("display_name"))
+            )

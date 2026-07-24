@@ -9,7 +9,13 @@ from odoo.exceptions import UserError
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
-    book_id = fields.Many2one("stock.book", "Voucher Book", copy=False, ondelete="restrict", check_company=True)
+    book_id = fields.Many2one(
+        "stock.book",
+        "Voucher Book",
+        copy=False,
+        ondelete="restrict",
+        check_company=True,
+    )
     vouchers = fields.Char(
         compute="_compute_vouchers",
         string="Vouchers (string)",
@@ -52,7 +58,7 @@ class StockPicking(models.Model):
         if lines_per_voucher == 0:
             return res
 
-        operations = len(self.move_ids)
+        operations = len(self.move_line_ids)
         res = int(-(-float(operations) // float(lines_per_voucher)))
         return res
 
@@ -81,6 +87,9 @@ class StockPicking(models.Model):
         self.message_post(body=_("Números de remitos asignados: %s") % (self.vouchers))
         self.write({"book_id": book.id})
 
+        # Send confirmation email with voucher numbers already assigned
+        self.with_context(from_assign_numbers=True)._send_confirmation_email()
+
     def clean_voucher_data(self):
         self.voucher_ids.unlink()
         self.book_id = False
@@ -101,6 +110,9 @@ class StockPicking(models.Model):
         """
         We separe to use it in other modules
         """
+        if self.picking_type_id.number_of_packages:
+            packages = self.move_line_ids.mapped("result_package_id").filtered(lambda p: p)
+            self.number_of_packages = len(packages)
         for picking in self:
             if picking.picking_type_id.code == "outgoing":
                 if picking.picking_type_id.restrict_number_package and not picking.number_of_packages > 0:
@@ -111,15 +123,6 @@ class StockPicking(models.Model):
             elif not picking.location_id.usage == "customer" and picking.voucher_required and not picking.voucher_ids:
                 raise UserError(_("You must set stock voucher numbers"))
         return True
-
-    def action_put_in_pack(self, move_lines_to_pack=False):
-        """
-        We override to compute number of packages
-        """
-        res = super().action_put_in_pack(move_lines_to_pack=move_lines_to_pack)
-        if self.picking_type_id.number_of_packages:
-            self.number_of_packages = len(self.package_level_ids)
-        return res
 
     def button_validate(self):
         """
@@ -174,7 +177,9 @@ class StockPicking(models.Model):
                 elif rec.picking_type_id.pricelist_id:
                     pricelist = rec.picking_type_id.pricelist_id
                     price = rec.picking_type_id.pricelist_id.with_context(uom=move_line.product_uom.id)._price_get(
-                        move_line.product_id, move_line.quantity or 1.0, partner=rec.partner_id.id
+                        move_line.product_id,
+                        move_line.quantity or 1.0,
+                        partner=rec.partner_id.id,
                     )[rec.picking_type_id.pricelist_id.id]
                     picking_value += price * move_line.product_uom_qty
                     done_value += price * move_line.quantity
@@ -190,8 +195,11 @@ class StockPicking(models.Model):
                         bom_moves = so_bom_line.move_ids & stock_bom_lines._origin
                         done_avg = []
                         picking_avg = []
+                        # Explode for 1 kit to get base quantities per component
                         boms, lines = bom.sudo().explode(
-                            so_bom_line.product_id, so_bom_line.product_uom_qty, picking_type=bom.picking_type_id
+                            so_bom_line.product_id,
+                            1.0,
+                            picking_type=bom.picking_type_id,
                         )
                         for move in bom_moves:
                             bom_quantity = 0.0
@@ -201,10 +209,14 @@ class StockPicking(models.Model):
                             if not bom_quantity:
                                 continue
                             rec_move = rec.move_ids.filtered(lambda m: m._origin.id == move.id)
+                            if not rec_move:
+                                continue
                             picking_avg.append(move.product_uom_qty / bom_quantity)
                             done_avg.append(rec_move.quantity / bom_quantity)
-                        picking_value += so_bom_line.price_reduce_taxexcl * (sum(picking_avg) / len(picking_avg))
-                        done_value += so_bom_line.price_reduce_taxexcl * (sum(done_avg) / len(done_avg))
+                        if picking_avg and done_avg:
+                            # Average represents how many kits, multiply by unit price
+                            picking_value += so_bom_line.price_reduce_taxexcl * (sum(picking_avg) / len(picking_avg))
+                            done_value += so_bom_line.price_reduce_taxexcl * (sum(done_avg) / len(done_avg))
 
             declared_value = picking_value if inmediate_transfer else done_value
             if pricelist:

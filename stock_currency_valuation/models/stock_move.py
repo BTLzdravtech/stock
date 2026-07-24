@@ -18,7 +18,10 @@ class StockMove(models.Model):
                 self.picking_id.currency_rate
                 and self.purchase_line_id.order_id.currency_id == self.picking_id.valuation_currency_id
             ):
-                price_units[index[0]] = self.purchase_line_id.price_unit / self.picking_id.currency_rate
+                # Use _get_gross_price_unit() so that UoM conversion (e.g. Box→Unit)
+                # and discounts are already applied; then divide by currency_rate
+                # to get the price in company currency per reference UoM.
+                price_units[index[0]] = self.purchase_line_id._get_gross_price_unit() / self.picking_id.currency_rate
         return price_units
 
     def _account_entry_move(self, qty, description, svl_id, cost):
@@ -47,34 +50,33 @@ class StockMove(models.Model):
             and move.with_company(move.company_id).product_id.categ_id.valuation_currency_id
             and move.with_company(move.company_id).product_id.cost_method == "average"
         ):
-            product_tot_qty_available = (
-                move.product_id.sudo().with_company(move.company_id).quantity_svl + tmpl_dict[move.product_id.id]
-            )
-            rounding = move.product_id.uom_id.rounding
+            product_with_company = move.product_id.with_company(move.company_id)
+            product_tot_qty_available = product_with_company.sudo().quantity_svl + tmpl_dict[move.product_id.id]
+            rounding = product_with_company.uom_id.rounding
 
             valued_move_lines = move._get_in_move_lines()
             qty_done = 0
             for valued_move_line in valued_move_lines:
                 qty_done += valued_move_line.product_uom_id._compute_quantity(
-                    valued_move_line.qty_done, move.product_id.uom_id
+                    valued_move_line.qty_done, product_with_company.uom_id
                 )
 
             qty = forced_qty or qty_done
             if float_is_zero(product_tot_qty_available, precision_rounding=rounding):
                 new_std_price_in_currency = move._get_currency_price_unit(
-                    default=move.product_id.standard_price_in_currency
+                    default=product_with_company.standard_price_in_currency
                 )
             elif float_is_zero(
                 product_tot_qty_available + move.product_qty, precision_rounding=rounding
             ) or float_is_zero(product_tot_qty_available + qty, precision_rounding=rounding):
                 new_std_price_in_currency = move._get_currency_price_unit(
-                    default=move.product_id.standard_price_in_currency
+                    default=product_with_company.standard_price_in_currency
                 )
             else:
                 # Get the standard price
                 amount_unit = (
                     std_price_update.get((move.company_id.id, move.product_id.id))
-                    or move.product_id.with_company(move.company_id).standard_price_in_currency
+                    or product_with_company.standard_price_in_currency
                 )
                 new_std_price_in_currency = (
                     (amount_unit * product_tot_qty_available) + (move._get_currency_price_unit() * qty)
@@ -82,7 +84,7 @@ class StockMove(models.Model):
 
             tmpl_dict[move.product_id.id] += qty_done
             # Write the standard price, as SUPERUSER_ID because a warehouse manager may not have the right to write on products
-            move.product_id.with_company(move.company_id.id).with_context(disable_auto_svl=True).sudo().write(
+            product_with_company.with_context(disable_auto_svl=True).sudo().write(
                 {"standard_price_in_currency": new_std_price_in_currency}
             )
 
@@ -105,12 +107,22 @@ class StockMove(models.Model):
         if hasattr(self, "sale_line_id") and self.sale_line_id:
             currency_id = self.sale_line_id.currency_id
 
-        price_unit = currency_id._convert(
-            from_amount=self.price_unit,
-            to_currency=self.product_id.categ_id.valuation_currency_id,
-            company=self.company_id,
-            date=fields.date.today(),
-        )
+        if (
+            self.picking_id.currency_rate
+            and self.purchase_line_id
+            and self.purchase_line_id.order_id.currency_id == self.picking_id.valuation_currency_id
+        ):
+            # When a custom currency_rate is set on the picking, use the PO line
+            # price directly in secondary currency (already UoM-converted by
+            # _get_gross_price_unit), so the AVCO update is consistent with the SVL.
+            price_unit = self.purchase_line_id._get_gross_price_unit()
+        else:
+            price_unit = currency_id._convert(
+                from_amount=self.price_unit,
+                to_currency=self.product_id.with_company(self.company_id.id).categ_id.valuation_currency_id,
+                company=self.company_id,
+                date=fields.date.today(),
+            )
         precision = self.env["decimal.precision"].precision_get("Product Price")
         # If the move is a return, use the original move's price unit.
         if self.origin_returned_move_id and self.origin_returned_move_id.sudo().stock_valuation_layer_ids:

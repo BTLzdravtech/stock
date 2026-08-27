@@ -1,6 +1,6 @@
 {
     "name": "Stock currency valuation",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Warehouse Management",
     "sequence": 14,
     "summary": "",
@@ -9,6 +9,7 @@
     "images": [],
     "depends": [
         "stock_account",
+        "stock_account_ux",
         "stock_landed_costs",
         "product_replenishment_cost",
     ],
@@ -21,6 +22,7 @@
         "views/product.xml",
         "views/stock_move_views.xml",
         "views/product_value_views.xml",
+        "views/stock_move_valuation_views.xml",
     ],
     "demo": [
         "demo/stock_currency_valuation_demo.xml",

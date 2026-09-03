@@ -65,6 +65,42 @@ To use this module, you need to:
 #. Create a record, choose the product and press "Compute lines"
 #. Review the proposed values, they are not written yet
 #. Press "Revaluate" to apply them
+#. To work on several at a time, tick them in the list and use the "Compute lines" and
+   "Revaluate" buttons of the header
+
+Computing lines does not touch the layers or their journal entries — all it writes are the
+recompute's own proposed lines — so the header button does it in the request and you see
+the result straight away. It still replays the whole valuation history of every product in
+the selection, so a selection of many products with long histories can run past the request
+timeout; if that happens nothing is saved, so work in smaller groups.
+
+Revaluating does write on the layers and on their journal entries, so the header button
+applies nothing however many records you select: it moves them to *Revaluating*, and a
+scheduled action applies them one by one in the background. Nothing to wait for on screen,
+and no selection large enough to time out the request. Cancelling a record before the
+scheduled action reaches it takes it out of the queue.
+
+A record that fails is left in *Error* with the reason on it, and the rest of the batch
+carries on. It is not retried on its own: the usual reason is a correction that starts
+before the fiscal lock date, which retrying does not fix. Filter the list by *Error* to see
+them; once the cause is sorted out, compute their lines again — which clears the reason —
+and revaluate. Only a record with computed lines can be revaluated, so a failure of the
+compute step can never be applied.
+
+Closed periods
+--------------
+
+A layer whose journal entry falls on or before the company's fiscal lock date is never
+proposed for adjustment. It is listed with the type *locked period* so it can be seen, and
+left with its recorded values, exactly as the layers before a manual valuation are.
+
+This is not only about respecting the close. Revaluating is all or nothing per record, so a
+single line in a closed period makes the whole product's correction fail — including the
+part that could have been applied. Reopening the period is an accounting decision; once the
+lock moves, the tool follows it with no configuration.
+
+A run can be narrowed further with the ``recompute_from_date`` context key, which moves the
+floor forward — never back, since proposing below the lock is what this avoids.
 
 Known issues / Roadmap
 ======================

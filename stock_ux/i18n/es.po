@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0+e\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-09 18:53+0000\n"
+"POT-Creation-Date: 2026-09-15 16:46+0000\n"
 "PO-Revision-Date: 2026-09-03 16:54+0000\n"
 "Last-Translator: Luciano Esperlazza <les@adhoc.inc>\n"
 "Language-Team: Spanish <https://translation.dev-adhoc.com/projects/"
@@ -268,7 +268,6 @@ msgstr ""
 #: model:ir.model.fields,field_description:stock_ux.field_stock_quant__display_name
 #: model:ir.model.fields,field_description:stock_ux.field_stock_return_picking__display_name
 #: model:ir.model.fields,field_description:stock_ux.field_stock_rule__display_name
-#: model:ir.model.fields,field_description:stock_ux.field_stock_scrap__display_name
 #: model:ir.model.fields,field_description:stock_ux.field_stock_warehouse_orderpoint__display_name
 msgid "Display Name"
 msgstr "Nombre para mostrar"
@@ -394,7 +393,6 @@ msgstr "Tiene Mensaje"
 #: model:ir.model.fields,field_description:stock_ux.field_stock_quant__id
 #: model:ir.model.fields,field_description:stock_ux.field_stock_return_picking__id
 #: model:ir.model.fields,field_description:stock_ux.field_stock_rule__id
-#: model:ir.model.fields,field_description:stock_ux.field_stock_scrap__id
 #: model:ir.model.fields,field_description:stock_ux.field_stock_warehouse_orderpoint__id
 msgid "ID"
 msgstr "ID (identificación)"
@@ -576,14 +574,6 @@ msgstr "Cantidad neta en ubicación"
 #. module: stock_ux
 #: model_terms:ir.ui.view,arch_db:stock_ux.view_picking_label_custom_qty
 msgid "No processed moves found in this picking."
-msgstr ""
-
-#. module: stock_ux
-#. odoo-python
-#: code:addons/stock_ux/models/stock_scrap.py:0
-msgid ""
-"No se puede desechar una cantidad mayor a la cantidad dentro de la "
-"transferencia del producto: %s."
 msgstr ""
 
 #. module: stock_ux
@@ -893,11 +883,6 @@ msgid ""
 "Scheduled date of the transfer, not replaced by the processing date once "
 "done."
 msgstr ""
-
-#. module: stock_ux
-#: model:ir.model,name:stock_ux.model_stock_scrap
-msgid "Scrap"
-msgstr "Desechar"
 
 #. module: stock_ux
 #: model:ir.actions.server,name:stock_ux.action_operation_set_all_undone

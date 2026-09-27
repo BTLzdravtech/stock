@@ -21,11 +21,11 @@ class StockPicking(models.Model):
         delivery_report = self.env.ref("stock.action_report_delivery")
 
         # Check if there's a substitution report for this picking
-        try:
-            substitution_report = delivery_report.get_substitution_report(self.ids)
-        except Exception:
-            # If substitution check fails, fall back to native behavior
-            substitution_report = False
+        substitution_report = (
+            delivery_report.get_substitution_report(self.ids)
+            if hasattr(delivery_report, "get_substitution_report")
+            else False
+        )
 
         if substitution_report:
             # Render the substitute report directly

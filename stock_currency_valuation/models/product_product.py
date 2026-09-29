@@ -34,20 +34,20 @@ class productProduct(models.Model):
     def write(self, vals):
         old_price = False
         old_price_in_currency = False
-        require_standard_price_compute = "standard_price_in_currency" in vals and not self.env.context.get(
-            "disable_auto_revaluation"
+        currency_products = self.filtered("valuation_currency_id")
+        require_standard_price_compute = (
+            currency_products
+            and "standard_price_in_currency" in vals
+            and not self.env.context.get("disable_auto_revaluation")
         )
         if require_standard_price_compute:
-            # old_price se captura igual que old_price_in_currency (antes de escribir):
-            # _change_standard_price compara ambos para decidir si el precio realmente
-            # cambió. Pasarle {} en vez de esto comparaba siempre contra None, así que la
-            # guarda de "no cambió" nunca se cumplía y cada write creaba un product.value
-            # espurio (ver TESTING.md, caso 2.5).
-            old_price = {product: product.standard_price for product in self}
-            old_price_in_currency = {product: product.standard_price_in_currency for product in self}
+            old_price = {product: product.standard_price for product in currency_products}
+            old_price_in_currency = {product: product.standard_price_in_currency for product in currency_products}
         res = super(productProduct, self.with_context(old_price_in_currency=old_price_in_currency)).write(vals)
         if old_price_in_currency:
-            self.with_context(old_price_in_currency=old_price_in_currency)._change_standard_price(old_price)
+            currency_products.with_context(old_price_in_currency=old_price_in_currency)._change_standard_price(
+                old_price
+            )
         return res
 
     @api.depends_context("to_date", "company", "warehouse_id")
@@ -120,8 +120,12 @@ class productProduct(models.Model):
     # -------------------------------------------------------------------------
 
     def _change_standard_price(self, old_price):
-        with_valuation_currency = self.filtered(lambda x: x.valuation_currency_id)
-        super(productProduct, self - with_valuation_currency)._change_standard_price(old_price)
+        with_valuation_currency = self.filtered(
+            lambda x: x.company_id.country_id.code == "AR" and x.valuation_currency_id
+        )
+        super(productProduct, self - with_valuation_currency)._change_standard_price(
+            {product: price for product, price in old_price.items() if product not in with_valuation_currency}
+        )
         old_price_in_currency = self.env.context.get("old_price_in_currency") or {}
         # Mismo criterio que el core: respetar valuation_date (p.ej. datetime.min al crear
         # el producto). Hardcodear now() fechaba el product.value inicial en la fecha real,
@@ -348,9 +352,19 @@ class productProduct(models.Model):
     def _update_standard_price(self, extra_value=None, extra_quantity=None):
         """Extiende _update_standard_price para también actualizar standard_price_in_currency
         en productos que tienen valuation_currency_id definido."""
-        super()._update_standard_price(extra_value=extra_value, extra_quantity=extra_quantity)
+        ar_products = self.filtered(lambda product: product.company_id.country_id.code == "AR")
+        super(productProduct, self - ar_products)._update_standard_price(
+            extra_value=extra_value, extra_quantity=extra_quantity
+        )
+        ar_products.with_context(skip_currency_valuation=True)._update_standard_price(
+            extra_value=extra_value, extra_quantity=extra_quantity
+        )
+        if self.env.context.get("skip_currency_valuation"):
+            return
 
-        products_with_currency = self.filtered(lambda p: p.valuation_currency_id and not p.lot_valuated)
+        products_with_currency = ar_products.filtered(
+            lambda product: product.valuation_currency_id and not product.lot_valuated
+        )
         if not products_with_currency:
             return
 

@@ -60,7 +60,8 @@ class StockMove(models.Model):
             return super()._check_quantity()
         elif any(
             self.filtered(
-                lambda x: x.picking_id.picking_type_id.block_additional_quantity
+                lambda x: x.company_id.country_id.code == "AR"
+                and x.picking_id.picking_type_id.block_additional_quantity
                 and float_compare(x.product_uom_qty, x.quantity, precision_digits=precision) == -1
             )
         ):
@@ -87,7 +88,7 @@ class StockMove(models.Model):
         defaults = super().default_get(fields_list)
         if self.env.context.get("default_picking_id"):
             picking_id = self.env["stock.picking"].browse(self.env.context["default_picking_id"])
-            if picking_id.state == "confirmed":
+            if picking_id.company_id.country_id.code == "AR" and picking_id.state == "confirmed":
                 defaults["state"] = "confirmed"
                 defaults["product_uom_qty"] = 0.0
                 defaults["additional"] = True
@@ -123,7 +124,8 @@ class StockMove(models.Model):
                 continue
             sp = self.env["stock.picking"].browse(vals["picking_id"])
             if (
-                sp.picking_type_id.block_additional_quantity
+                sp.company_id.country_id.code == "AR"
+                and sp.picking_type_id.block_additional_quantity
                 and sp.sale_id
                 and (sp.sale_id.state == "sale" or sp.sale_id.state == "done")
             ):
@@ -139,7 +141,7 @@ class StockMove(models.Model):
     @api.depends("state", "picking_id")
     def _compute_is_initial_demand_editable(self):
         super(StockMove, self)._compute_is_initial_demand_editable()
-        for move in self:
+        for move in self.filtered(lambda m: m.company_id.country_id.code == "AR"):
             if move.picking_id.picking_type_id.block_additional_quantity and move.picking_id.state != "draft":
                 move.is_initial_demand_editable = False
 

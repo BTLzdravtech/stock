@@ -44,8 +44,10 @@
             <!-- Reemplazamos el botón Print nativo (visible para in_progress y done)
                  por dos botones: uno para in_progress (batch transfer) y otro
                  para done (delivery slip), igual que en los pickings nativos. -->
-            <button name="action_print" position="replace">
-                <button name="action_print" invisible="state != 'in_progress'" string="Print" type="object" data-hotkey="o"/>
+            <button name="action_print" position="attributes">
+                <attribute name="invisible">state != 'in_progress'</attribute>
+            </button>
+            <button name="action_print" position="after">
                 <button name="action_print_delivery_slip" invisible="state != 'done'" string="Print" type="object" data-hotkey="o"/>
             </button>
 

@@ -2,7 +2,7 @@
 # For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
 
@@ -35,5 +35,9 @@ class StockPicking(models.Model):
                     or rec.state != rec.state_detail_id.state
                 ):
                     raise ValidationError(
-                        f"You're selecting a state detail that doesn’t belong to this state: {rec.state} or picking type: {rec.picking_type_id.code}"
+                        _(
+                            "The selected state detail does not belong to state %(state)s or picking type %(picking_type)s.",
+                            state=rec.state,
+                            picking_type=rec.picking_type_id.code,
+                        )
                     )

@@ -29,13 +29,16 @@ class StockPicking(models.Model):
         """
 
         # We compute number of packages according to packages_count
-        for picking in self.filtered("picking_type_id.number_of_packages"):
+        for picking in self.filtered(
+            lambda p: p.company_id.country_id.code == "AR" and p.picking_type_id.number_of_packages
+        ):
             picking.number_of_packages = picking.packages_count
 
         # Check number of packages restriction
         restricted_pickings = self.filtered(
             lambda x: (
-                x.picking_type_id.code == "outgoing"
+                x.company_id.country_id.code == "AR"
+                and x.picking_type_id.code == "outgoing"
                 and x.picking_type_id.restrict_number_package
                 and not x.number_of_packages
             )
@@ -69,7 +72,7 @@ class StockPicking(models.Model):
             )
 
     def copy(self, default=None):
-        for picking in self:
+        for picking in self.filtered(lambda p: p.company_id.country_id.code == "AR"):
             if not default and picking.picking_type_id.block_additional_quantity:
                 raise UserError(
                     _(
@@ -92,27 +95,28 @@ class StockPicking(models.Model):
             self.move_ids.update({"location_dest_id": self.location_dest_id.id})
 
     def _send_confirmation_email(self):
-        for rec in self:
-            if rec.picking_type_id.mail_template_id:
-                try:
-                    rec.with_context(
-                        email_notification_force_header=True,
-                        email_notification_force_footer=True,
-                    ).message_post_with_source(rec.picking_type_id.mail_template_id)
-                except Exception as error:
-                    title = _("ERROR: Picking was not sent via email")
-                    rec.message_post(
-                        body="<br/><br/>".join(
-                            [
-                                "<b>" + title + "</b>",
-                                _("Please check the email template associated with the picking type."),
-                                "<code>" + str(error) + "</code>",
-                            ]
-                        ),
-                        body_is_html=True,
-                    )
-            else:
-                super(StockPicking, self)._send_confirmation_email()
+        ar_pickings = self.filtered(lambda p: p.company_id.country_id.code == "AR")
+        for rec in ar_pickings.filtered("picking_type_id.mail_template_id"):
+            try:
+                rec.with_context(
+                    email_notification_force_header=True,
+                    email_notification_force_footer=True,
+                ).message_post_with_source(rec.picking_type_id.mail_template_id)
+            except Exception as error:
+                title = _("ERROR: Picking was not sent via email")
+                rec.message_post(
+                    body="<br/><br/>".join(
+                        [
+                            "<b>" + title + "</b>",
+                            _("Please check the email template associated with the picking type."),
+                            "<code>" + str(error) + "</code>",
+                        ]
+                    ),
+                    body_is_html=True,
+                )
+        return super(
+            StockPicking, self - ar_pickings.filtered("picking_type_id.mail_template_id")
+        )._send_confirmation_email()
 
     def new_force_availability(self):
         self.action_assign()

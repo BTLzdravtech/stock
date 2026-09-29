@@ -19,7 +19,7 @@
 ##############################################################################
 {
     "name": "Stock Landed Costs UX",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Warehouse Management",
     "sequence": 14,
     "summary": "",

@@ -39,13 +39,17 @@ class StockMove(models.Model):
         "move_line_ids.lot_id",
     )
     def _compute_used_lots(self):
-        for rec in self:
+        non_ar_moves = self.filtered(lambda move: move.company_id.country_id.code != "AR")
+        non_ar_moves.used_lots = False
+        for rec in self - non_ar_moves:
             rec.used_lots = ", ".join(
                 rec.move_line_ids.filtered("lot_id").mapped(lambda x: "%s (%s)" % (x.lot_id.name, x.quantity))
             )
 
     def _compute_origin_description(self):
-        for rec in self:
+        non_ar_moves = self.filtered(lambda move: move.company_id.country_id.code != "AR")
+        non_ar_moves.origin_description = False
+        for rec in self - non_ar_moves:
             if rec.sale_line_id:
                 rec.origin_description = rec.sale_line_id.name
             elif rec.picking_id.origin:
@@ -60,17 +64,18 @@ class StockMove(models.Model):
             return super()._check_quantity()
         elif any(
             self.filtered(
-                lambda x: x.picking_id.picking_type_id.block_additional_quantity
+                lambda x: x.company_id.country_id.code == "AR"
+                and x.picking_id.picking_type_id.block_additional_quantity
                 and float_compare(x.product_uom_qty, x.quantity, precision_digits=precision) == -1
             )
         ):
             raise ValidationError(_("You can not transfer more than the initial demand!"))
 
     def action_view_linked_record(self):
-        """This function returns an action that display existing sales order
-        of given picking.
-        """
+        """Open the linked document only for Argentine companies."""
         self.ensure_one()
+        if self.company_id.country_id.code != "AR":
+            return False
         action_ref = self.env.context.get("action")
         form_view_ref = self.env.context.get("form_view")
         action = self.env["ir.actions.actions"]._for_xml_id(action_ref)
@@ -87,7 +92,7 @@ class StockMove(models.Model):
         defaults = super().default_get(fields_list)
         if self.env.context.get("default_picking_id"):
             picking_id = self.env["stock.picking"].browse(self.env.context["default_picking_id"])
-            if picking_id.state == "confirmed":
+            if picking_id.company_id.country_id.code == "AR" and picking_id.state == "confirmed":
                 defaults["state"] = "confirmed"
                 defaults["product_uom_qty"] = 0.0
                 defaults["additional"] = True
@@ -112,9 +117,15 @@ class StockMove(models.Model):
         )
 
     def action_explode(self):
-        # Cuando se explota un kit, MRP cancela y elimina el move original del producto kit,
-        # aunque tenga sale_line_id. Permitimos ese unlink con can_delete=True.
-        return super(StockMove, self.with_context(can_delete=True)).action_explode()
+        """Allow kit explosion to remove the original move only for AR companies."""
+        ar_moves = self.filtered(lambda move: move.company_id.country_id.code == "AR")
+        non_ar_moves = self - ar_moves
+        exploded = self.browse()
+        if ar_moves:
+            exploded = super(StockMove, ar_moves.with_context(can_delete=True)).action_explode()
+        if non_ar_moves:
+            exploded |= super(StockMove, non_ar_moves).action_explode()
+        return exploded
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -123,7 +134,8 @@ class StockMove(models.Model):
                 continue
             sp = self.env["stock.picking"].browse(vals["picking_id"])
             if (
-                sp.picking_type_id.block_additional_quantity
+                sp.company_id.country_id.code == "AR"
+                and sp.picking_type_id.block_additional_quantity
                 and sp.sale_id
                 and (sp.sale_id.state == "sale" or sp.sale_id.state == "done")
             ):
@@ -139,7 +151,7 @@ class StockMove(models.Model):
     @api.depends("state", "picking_id")
     def _compute_is_initial_demand_editable(self):
         super(StockMove, self)._compute_is_initial_demand_editable()
-        for move in self:
+        for move in self.filtered(lambda m: m.company_id.country_id.code == "AR"):
             if move.picking_id.picking_type_id.block_additional_quantity and move.picking_id.state != "draft":
                 move.is_initial_demand_editable = False
 

@@ -6,6 +6,8 @@ class StockScrap(models.Model):
     _inherit = "stock.scrap"
 
     def action_validate(self):
+        if self.company_id.country_id.code != "AR":
+            return super().action_validate()
         total_scraped = sum(
             scrap.scrap_qty
             for scrap in self.env["stock.scrap"].search(

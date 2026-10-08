@@ -19,7 +19,7 @@
 ##############################################################################
 {
     "name": "Stock Repair UX",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Warehouse Management",
     "summary": "Show a visible button to create a repair from a receipt",
     "author": "ADHOC SA",
@@ -32,6 +32,6 @@
         "views/stock_picking_views.xml",
     ],
     "installable": True,
-    "auto_install": True,
+    "auto_install": False,
     "application": False,
 }

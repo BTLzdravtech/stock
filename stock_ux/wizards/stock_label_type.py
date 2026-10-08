@@ -15,9 +15,22 @@ class ProductLabelLayout(models.TransientModel):
         ondelete={"zpl_5x25": "set default"},
     )
 
+    def _is_argentine_label_context(self):
+        company = self.env.company
+        active_model = self.env.context.get("active_model")
+        active_ids = self.env.context.get("active_ids") or self.env.context.get("active_id")
+        if active_model == "stock.picking" and active_ids:
+            company = self.env["stock.picking"].browse(active_ids).company_id[:1] or company
+        elif self.env.context.get("default_move_ids"):
+            moves = self.env["stock.move"].browse(self.env.context["default_move_ids"])
+            company = moves.company_id[:1] or company
+        return company.country_id.code == "AR"
+
     @api.model
     def default_get(self, default_fields):
         rec = super().default_get(default_fields)
+        if not self._is_argentine_label_context():
+            return rec
         active_ids = self.env.context.get("active_ids") or self.env.context.get("active_id")
         active_model = self.env.context.get("active_model")
         if active_model == "stock.picking":
@@ -57,8 +70,10 @@ class ProductLabelLayout(models.TransientModel):
         ]
 
     def process(self):
-        """Intercept the standard Print button to use our custom ZPL report when selected."""
+        """Use the custom ZPL report only for Argentine companies."""
         self.ensure_one()
+        if self.company_id.country_id.code != "AR":
+            return super().process()
         if self.zpl_template == "zpl_5x25":
             if self.picking_id:
                 return self.action_print()
@@ -66,8 +81,10 @@ class ProductLabelLayout(models.TransientModel):
         return super().process()
 
     def _prepare_report_data(self):
-        """When in picking context with per-product custom quantities, use line_ids values."""
+        """Use per-product quantities only for Argentine companies."""
         xml_id, data = super()._prepare_report_data()
+        if self.company_id.country_id.code != "AR":
+            return xml_id, data
         if self.picking_id and self.move_quantity == "custom" and self.line_ids:
             qty_map = {}
             for line in self.line_ids:

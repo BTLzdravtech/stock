@@ -72,10 +72,10 @@ class StockMove(models.Model):
             raise ValidationError(_("You can not transfer more than the initial demand!"))
 
     def action_view_linked_record(self):
-        """This function returns an action that display existing sales order
-        of given picking.
-        """
+        """Open the linked document only for Argentine companies."""
         self.ensure_one()
+        if self.company_id.country_id.code != "AR":
+            return False
         action_ref = self.env.context.get("action")
         form_view_ref = self.env.context.get("form_view")
         action = self.env["ir.actions.actions"]._for_xml_id(action_ref)
@@ -117,9 +117,15 @@ class StockMove(models.Model):
         )
 
     def action_explode(self):
-        # Cuando se explota un kit, MRP cancela y elimina el move original del producto kit,
-        # aunque tenga sale_line_id. Permitimos ese unlink con can_delete=True.
-        return super(StockMove, self.with_context(can_delete=True)).action_explode()
+        """Allow kit explosion to remove the original move only for AR companies."""
+        ar_moves = self.filtered(lambda move: move.company_id.country_id.code == "AR")
+        non_ar_moves = self - ar_moves
+        exploded = self.browse()
+        if ar_moves:
+            exploded = super(StockMove, ar_moves.with_context(can_delete=True)).action_explode()
+        if non_ar_moves:
+            exploded |= super(StockMove, non_ar_moves).action_explode()
+        return exploded
 
     @api.model_create_multi
     def create(self, vals_list):

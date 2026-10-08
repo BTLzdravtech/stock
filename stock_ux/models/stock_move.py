@@ -39,13 +39,17 @@ class StockMove(models.Model):
         "move_line_ids.lot_id",
     )
     def _compute_used_lots(self):
-        for rec in self:
+        non_ar_moves = self.filtered(lambda move: move.company_id.country_id.code != "AR")
+        non_ar_moves.used_lots = False
+        for rec in self - non_ar_moves:
             rec.used_lots = ", ".join(
                 rec.move_line_ids.filtered("lot_id").mapped(lambda x: "%s (%s)" % (x.lot_id.name, x.quantity))
             )
 
     def _compute_origin_description(self):
-        for rec in self:
+        non_ar_moves = self.filtered(lambda move: move.company_id.country_id.code != "AR")
+        non_ar_moves.origin_description = False
+        for rec in self - non_ar_moves:
             if rec.sale_line_id:
                 rec.origin_description = rec.sale_line_id.name
             elif rec.picking_id.origin:

@@ -19,7 +19,7 @@
 ##############################################################################
 {
     "name": "Stock UX",
-    "version": "19.0.1.13.4",
+    "version": "19.0.1.13.5",
     "category": "Warehouse Management",
     "sequence": 14,
     "summary": "",

@@ -96,7 +96,7 @@ class StockMoveLine(models.Model):
         """This is to solve a bug when create the sml (the value is not completed after creation)
         and should be reported to odoo to solve."""
         recs = super().create(vals_list)
-        for rec in recs:
+        for rec in recs.filtered(lambda line: line.company_id.country_id.code == "AR"):
             if rec.picking_id and not rec.description_picking:
                 product = rec.product_id.with_context(lang=rec.picking_id.partner_id.lang or rec.env.user.lang)
                 rec.description_picking = product._get_description(rec.picking_id.picking_type_id)
@@ -137,7 +137,9 @@ class StockMoveLine(models.Model):
         It uses the `from_inverse_qty_done` context key to indicate that the update originates from
         this method.
         """
-        for line in self:
+        non_ar_lines = self.filtered(lambda line: line.company_id.country_id.code != "AR")
+        super(StockMoveLine, non_ar_lines)._inverse_qty_done()
+        for line in self - non_ar_lines:
             line.with_context(from_inverse_qty_done=True).quantity = line.qty_done
             line.picked = line.quantity > 0
 

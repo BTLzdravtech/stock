@@ -164,7 +164,7 @@ class StockPicking(models.Model):
         if "picking_type_id" in vals:
             user = self.env.user
             if user.has_group("stock_ux.group_restrict_edit_picking_type"):
-                for picking in self:
+                for picking in self.filtered(lambda record: record.company_id.country_id.code == "AR"):
                     if picking.picking_type_id:
                         raise UserError(
                             _(

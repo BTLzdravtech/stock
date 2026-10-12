@@ -6,8 +6,7 @@
         <field name="inherit_id" ref="stock.product_label_layout_form_picking"/>
         <field name="name">product.label.layout.picking.custom.qty</field>
         <field name="arch" type="xml">
-            <!-- Insert picking_id hidden field into the existing options group -->
-            <xpath expr="//group[1]" position="inside">
+            <xpath expr="//field[@name='custom_quantity']" position="before">
                 <field name="picking_id" invisible="1"/>
             </xpath>
             <!-- Place quantities table and empty alert below all option groups, just before footer -->
@@ -41,8 +40,7 @@
         <field name="inherit_id" ref="product.product_label_layout_form"/>
         <field name="name">product.label.layout.template.variant.qty</field>
         <field name="arch" type="xml">
-            <!-- Insert variant table and from_template state just before the footer,
-                 to avoid displacing //group[1] used by the picking inherited view. -->
+            <!-- Insert variant table and from_template state just before the footer. -->
             <xpath expr="//footer" position="before">
                 <field name="from_template" invisible="1"/>
                 <group string="Variants to Print" invisible="not from_template">

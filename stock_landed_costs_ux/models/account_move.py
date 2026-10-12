@@ -1,19 +1,23 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import fields, models
+from odoo import models
 
 
 class AccountMove(models.Model):
     _inherit = "account.move"
 
     def button_create_landed_costs(self):
-        """Modifies the original method changing the price_unit of the landed_costs
-        If the account.move has a different currency change from the one defined in the company,
-        takes this one to calculate the price_unit
+        """Use the inverse invoice rate only when the invoice provides one.
+
+        Core handles every other case, including refund signs.
         """
         self.ensure_one()
-        landed_costs_lines = self.line_ids.filtered(lambda line: line.is_landed_costs_line)
-        rate_to_use = self.inverse_invoice_currency_rate if self.inverse_invoice_currency_rate else None
+        rate_to_use = self.inverse_invoice_currency_rate if "inverse_invoice_currency_rate" in self._fields else 0.0
+        if not rate_to_use:
+            return super().button_create_landed_costs()
+
+        landed_costs_lines = self.line_ids.filtered("is_landed_costs_line")
+        sign = -1 if self.move_type == "in_refund" else 1
         landed_costs = (
             self.env["stock.landed.cost"]
             .with_company(self.company_id)
@@ -25,29 +29,19 @@ class AccountMove(models.Model):
                             0,
                             0,
                             {
-                                "product_id": l.product_id.id,
-                                "name": l.product_id.name,
-                                "account_id": l.product_id.product_tmpl_id.get_product_accounts()["stock_valuation"].id,
-                                "price_unit": self._compute_price_unit(l, rate_to_use),
-                                "split_method": l.product_id.split_method_landed_cost or "equal",
+                                "product_id": line.product_id.id,
+                                "name": line.product_id.name,
+                                "account_id": line.product_id.product_tmpl_id.get_product_accounts()[
+                                    "stock_valuation"
+                                ].id,
+                                "price_unit": sign * line.price_subtotal * rate_to_use,
+                                "split_method": line.product_id.split_method_landed_cost or "equal",
                             },
                         )
-                        for l in landed_costs_lines
+                        for line in landed_costs_lines
                     ],
                 }
             )
         )
         action = self.env["ir.actions.actions"]._for_xml_id("stock_landed_costs.action_stock_landed_cost")
         return dict(action, view_mode="form", res_id=landed_costs.id, views=[(False, "form")])
-
-    def _compute_price_unit(self, landed_cost_line, rate_to_use):
-        """Calculates the price_unit using the corresponding currency rate"""
-        if rate_to_use:
-            return landed_cost_line.price_subtotal * rate_to_use
-        else:
-            return landed_cost_line.currency_id._convert(
-                landed_cost_line.price_subtotal,
-                landed_cost_line.company_currency_id,
-                landed_cost_line.company_id,
-                self.invoice_date or fields.Date.context_today(self),
-            )

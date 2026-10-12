@@ -16,11 +16,14 @@ class StockPicking(models.Model):
     )
 
     @api.depends(
+        "company_id.country_id",
         "move_ids.state",
         "move_ids.quantity",
     )
     def _compute_declared_value(self):
-        for rec in self.filtered(
+        non_ar_pickings = self.filtered(lambda picking: picking.company_id.country_id.code != "AR")
+        non_ar_pickings.declared_value = 0.0
+        for rec in (self - non_ar_pickings).filtered(
             lambda p: p.picking_type_id.automatic_declare_value and p.state not in ["done", "cancel"]
         ):
             done_value = 0.0

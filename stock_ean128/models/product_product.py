@@ -3,33 +3,39 @@
 # directory
 ##############################################################################
 from odoo import api, models
+from odoo.fields import Domain
 
 
 class ProductProduct(models.Model):
     _inherit = "product.product"
 
     @api.model
-    def name_search(self, name, args=None, operator="ilike", limit=100):
-        res = super().name_search(name, args=args, operator=operator, limit=limit)
-        if not limit or len(res) < limit:
-            # do not search for lots of products that are already displayed
-            actual_product_ids = [x[0] for x in res]
-            if not args:
-                args = []
-            if name and name[0].encode("utf8") == " ":
-                name = name[1:]
-            products = (
-                self.env["stock.lot"]
-                .search(
-                    [
-                        ("ean_128", operator, name),
-                        ("product_id", "not in", actual_product_ids),
-                    ],
-                    limit=limit,
-                )
-                .mapped("product_id")
-            )
-            if products:
-                prods = self.search([("id", "in", products.ids)] + args, limit=limit)
-                res += prods.name_get()
-        return res
+    def _search_display_name(self, operator, value):
+        domain = super()._search_display_name(operator, value)
+        if not isinstance(value, str):
+            return domain
+        ean_value = value[1:] if value.startswith(" ") else value
+        if not ean_value:
+            return domain
+        lot_domain = Domain("lot_ids", "any", Domain("ean_128", operator, ean_value))
+        if operator in Domain.NEGATIVE_OPERATORS:
+            return domain & lot_domain
+        return domain | lot_domain
+
+    @api.model
+    def name_search(self, name="", domain=None, operator="ilike", limit=100):
+        results = super().name_search(name, domain, operator, limit)
+        if not name or operator in Domain.NEGATIVE_OPERATORS or (limit and len(results) >= limit):
+            return results
+        ean_name = name[1:] if name.startswith(" ") else name
+        if not ean_name:
+            return results
+        product_domain = Domain(domain or Domain.TRUE)
+        products = self.search_fetch(
+            product_domain
+            & Domain("id", "not in", [product_id for product_id, _display_name in results])
+            & Domain("lot_ids", "any", Domain("ean_128", operator, ean_name)),
+            ["display_name"],
+            limit=limit - len(results) if limit else None,
+        )
+        return results + [(product.id, product.display_name) for product in products.sudo()]

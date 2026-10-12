@@ -38,7 +38,7 @@ class StockMove(models.Model):
             if self.env.context.get("button_validate_picking_ids") and rec.picking_id.id not in self.env.context.get(
                 "button_validate_picking_ids"
             ):
-                return True
+                continue
             elif rec.location_id not in user_locations:
                 raise ValidationError(message % (rec.picking_id.name, rec.location_id.name))
             elif rec.location_dest_id not in user_locations:

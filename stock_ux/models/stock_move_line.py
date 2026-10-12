@@ -55,7 +55,8 @@ class StockMoveLine(models.Model):
             return
         if any(
             self.filtered(
-                lambda x: not x.location_id.should_bypass_reservation()
+                lambda x: x.company_id.country_id.code == "AR"
+                and not x.location_id.should_bypass_reservation()
                 and x.picking_id.picking_type_id.block_manual_lines
                 and x._check_quantity_available() < 0
             )
@@ -95,7 +96,7 @@ class StockMoveLine(models.Model):
         """This is to solve a bug when create the sml (the value is not completed after creation)
         and should be reported to odoo to solve."""
         recs = super().create(vals_list)
-        for rec in recs:
+        for rec in recs.filtered(lambda line: line.company_id.country_id.code == "AR"):
             if rec.picking_id and not rec.description_picking:
                 product = rec.product_id.with_context(lang=rec.picking_id.partner_id.lang or rec.env.user.lang)
                 rec.description_picking = product._get_description(rec.picking_id.picking_type_id)
@@ -105,7 +106,8 @@ class StockMoveLine(models.Model):
     def _get_aggregated_product_quantities(self, **kwargs):
         aggregated_move_lines = super()._get_aggregated_product_quantities(**kwargs)
         use_origin = (
-            self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_use_origin", "False") == "True"
+            self.company_id.country_id.code == "AR"
+            and self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_use_origin", "False") == "True"
         )
         if use_origin:
             move_line_by_move = {}
@@ -135,13 +137,17 @@ class StockMoveLine(models.Model):
         It uses the `from_inverse_qty_done` context key to indicate that the update originates from
         this method.
         """
-        for line in self:
+        non_ar_lines = self.filtered(lambda line: line.company_id.country_id.code != "AR")
+        super(StockMoveLine, non_ar_lines)._inverse_qty_done()
+        for line in self - non_ar_lines:
             line.with_context(from_inverse_qty_done=True).quantity = line.qty_done
             line.picked = line.quantity > 0
 
     def _get_aggregated_properties(self, move_line=False, move=False):
+        company = (move_line or move).company_id if (move_line or move) else self.env.company
         use_origin = (
-            self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_use_origin", "False") == "True"
+            company.country_id.code == "AR"
+            and self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_use_origin", "False") == "True"
         )
         picking = move_line.picking_id if move_line else (move.picking_id if move else False)
         if use_origin and picking and picking.origin:

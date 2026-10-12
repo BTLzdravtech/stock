@@ -2,7 +2,7 @@
 # For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 class ProductTemplate(models.Model):
@@ -16,17 +16,15 @@ class ProductTemplate(models.Model):
     )
 
     def _compute_get_lots(self):
+        lots = self.env["stock.lot"].search([("product_id.product_tmpl_id", "in", self.ids)])
+        lots_by_template = {}
+        for lot in lots:
+            lots_by_template.setdefault(lot.product_id.product_tmpl_id.id, self.env["stock.lot"])
+            lots_by_template[lot.product_id.product_tmpl_id.id] |= lot
         for rec in self:
-            rec.lot_ids = self.env["stock.lot"].search([("product_id.product_tmpl_id", "=", self.id)])
+            rec.lot_ids = lots_by_template.get(rec.id, self.env["stock.lot"])
 
-    @api.model
     def _search_lots(self, operator, operand):
-        if operand[0].encode("utf8") == " ":
+        if isinstance(operand, str) and operand.startswith("\xa0"):
             operand = operand[1:]
-        templates = (
-            self.env["stock.lot"]
-            .search([("ean_128", operator, operand)])
-            .mapped("product_id")
-            .mapped("product_tmpl_id")
-        )
-        return [("id", "in", templates.ids)]
+        return [("product_variant_ids.lot_ids.ean_128", operator, operand)]

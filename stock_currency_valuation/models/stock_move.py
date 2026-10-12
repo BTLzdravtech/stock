@@ -46,7 +46,11 @@ class StockMove(models.Model):
         for move in self:
             move.value_manual_in_currency = move.value_in_currency
 
-    def _set_value(self, correction_quantity=None):
+    def _set_value(self):
+        ar_moves = self.filtered(lambda move: move.company_id.country_id.code == "AR")
+        super(StockMove, self - ar_moves)._set_value()
+        if not ar_moves:
+            return
         # AVCO en moneda secundaria ANTES de que super() dispare _update_standard_price.
         # Los OUT (con o sin picking) y los ajustes de entrada sin picking valúan
         # value_in_currency a este AVCO; capturamos el valor previo para que, si ese
@@ -54,10 +58,10 @@ class StockMove(models.Model):
         # degradado por este move.
         std_price_in_currency_before = {
             move.product_id.id: move.product_id.with_company(move.company_id).standard_price_in_currency
-            for move in self
+            for move in ar_moves
             if move.with_company(move.company_id).valuation_currency_id
         }
-        super()._set_value(correction_quantity=correction_quantity)
+        super(StockMove, ar_moves)._set_value()
         # Agrupado por compañía (no un set plano): el core recompute standard_price con
         # with_company(company) de cada move (ver stock_account._set_value), porque
         # self.env.company puede no coincidir con move.company_id (batch multi-compañía,
@@ -68,9 +72,9 @@ class StockMove(models.Model):
         # sudo: stock.valuation.adjustment.lines sólo es legible por
         # stock.group_stock_manager, pero este cómputo interno de valuación
         # corre para cualquier usuario que valide un move (p.ej. flujos de caja).
-        landed_costs_by_move = self.sudo()._get_landed_cost()
+        landed_costs_by_move = ar_moves.sudo()._get_landed_cost()
 
-        for move in self:
+        for move in ar_moves:
             if move.with_company(move.company_id).valuation_currency_id and move.value:
                 if move.is_dropship or move.is_in:
                     products_to_recompute_by_company[move.company_id.id].add(move.product_id.id)

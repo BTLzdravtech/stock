@@ -16,4 +16,6 @@ class StockMove(models.Model):
         for rec in self:
             rec.request_order_id = rec.stock_request_ids.mapped("order_id")
 
-    # DEPRECATED def _split(self, qty, restrict_partner_id=False)
+    def copy_data(self, default=None):
+        """Keep request allocations only for explicit partial-delivery splits."""
+        return super().copy_data(default)

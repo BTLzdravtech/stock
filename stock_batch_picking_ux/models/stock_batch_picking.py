@@ -122,7 +122,6 @@ class StockPickingBatch(models.Model):
         given batch picking.
         """
         self.ensure_one()
-        pickings = self.mapped("picking_ids")
-        action = self.env.ref("stock.action_picking_tree_all").read([])[0]
-        action["domain"] = [("id", "in", pickings.ids)]
+        action = self.env["ir.actions.act_window"]._for_xml_id("stock.action_picking_tree_all")
+        action["domain"] = [("id", "in", self.picking_ids.ids)]
         return action

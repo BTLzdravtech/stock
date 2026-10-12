@@ -10,7 +10,7 @@ def migrate(cr, version):
     env = api.Environment(cr, SUPERUSER_ID, {})
     pickings = env["stock.picking"].search(
         [
-            ("company_id.country_id.code", "!=", "AR"),
+            ("company_id.partner_id.country_id.code", "!=", "AR"),
             ("declared_value", "!=", 0.0),
         ],
         order="id",

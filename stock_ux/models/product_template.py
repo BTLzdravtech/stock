@@ -21,6 +21,8 @@ class ProductTemplate(models.Model):
 
     def action_view_stock_move(self):
         self.ensure_one()
+        if self.company_id.country_id.code != "AR":
+            return False
         action = self.env["ir.actions.actions"]._for_xml_id("stock.stock_move_action")
         action["domain"] = [("product_id.product_tmpl_id", "in", self.ids)]
         action["context"] = {

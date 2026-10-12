@@ -55,7 +55,8 @@ class StockMoveLine(models.Model):
             return
         if any(
             self.filtered(
-                lambda x: not x.location_id.should_bypass_reservation()
+                lambda x: x.company_id.country_id.code == "AR"
+                and not x.location_id.should_bypass_reservation()
                 and x.picking_id.picking_type_id.block_manual_lines
                 and x._check_quantity_available() < 0
             )
@@ -95,63 +96,98 @@ class StockMoveLine(models.Model):
         """This is to solve a bug when create the sml (the value is not completed after creation)
         and should be reported to odoo to solve."""
         recs = super().create(vals_list)
-        for rec in recs:
+        for rec in recs.filtered(lambda line: line.company_id.country_id.code == "AR"):
             if rec.picking_id and not rec.description_picking:
                 product = rec.product_id.with_context(lang=rec.picking_id.partner_id.lang or rec.env.user.lang)
                 rec.description_picking = product._get_description(rec.picking_id.picking_type_id)
         recs._check_manual_lines()
         return recs
 
+    def _get_aggregated_product_quantities(self, **kwargs):
+        aggregated_move_lines = super()._get_aggregated_product_quantities(**kwargs)
+        use_origin = (
+            self.company_id.country_id.code == "AR"
+            and self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_use_origin", "False") == "True"
+        )
+        if use_origin:
+            move_line_by_move = {}
+            for sml in self:
+                move = sml.move_id
+                if move and move.origin_description and sml.picking_id.origin:
+                    move_line_by_move.setdefault(
+                        move.id,
+                        {
+                            "description": move.origin_description,
+                            "product_id": sml.product_id.id,
+                        },
+                    )
+            used_moves = set()
+            for line_data in aggregated_move_lines.values():
+                for move_id, move_info in move_line_by_move.items():
+                    if move_info["product_id"] == line_data["product"].id and move_id not in used_moves:
+                        line_data["description"] = False
+                        line_data["reference"] = move_info["description"]
+                        used_moves.add(move_id)
+                        break
+
+        return aggregated_move_lines
+
     def _inverse_qty_done(self):
         """
         It uses the `from_inverse_qty_done` context key to indicate that the update originates from
         this method.
         """
-        for line in self:
+        non_ar_lines = self.filtered(lambda line: line.company_id.country_id.code != "AR")
+        super(StockMoveLine, non_ar_lines)._inverse_qty_done()
+        for line in self - non_ar_lines:
             line.with_context(from_inverse_qty_done=True).quantity = line.qty_done
             line.picked = line.quantity > 0
 
     def _get_aggregated_properties(self, move_line=False, move=False):
-        """Con delivery_slip_use_origin mostramos la descripción de origen en vez de la de la
-        operación, pisando solo lo necesario sobre el dict del super."""
-        properties = super()._get_aggregated_properties(move_line=move_line, move=move)
+        company = (move_line or move).company_id if (move_line or move) else self.env.company
         use_origin = (
-            self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_use_origin", "False") == "True"
+            company.country_id.code == "AR"
+            and self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_use_origin", "False") == "True"
         )
         picking = move_line.picking_id if move_line else (move.picking_id if move else False)
-        move = move or move_line.move_id
-        if not use_origin or not picking or not picking.origin or not move.origin_description:
-            return properties
+        if use_origin and picking and picking.origin:
+            move = move or move_line.move_id
+            uom = move.product_uom or move_line.product_uom_id
+            reference = move.product_id.display_name
+            origin_description = move.origin_description or reference
+            product = move.product_id
 
-        product = move.product_id
-        reference = product.display_name
-        origin_description = move.origin_description
+            add_product_name = (
+                self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_add_product_name", "False")
+                == "True"
+            )
 
-        add_product_name = (
-            self.env["ir.config_parameter"].sudo().get_param("stock_ux.delivery_slip_add_product_name", "False")
-            == "True"
-        )
+            # Clean the origin_description by removing product name prefix
+            clean_description = origin_description
+            if origin_description != reference:
+                if origin_description.startswith(reference):
+                    clean_description = origin_description.removeprefix(reference).strip()
+                elif origin_description.startswith(product.name):
+                    clean_description = origin_description.removeprefix(product.name).strip()
 
-        # Clean the origin_description by removing product name prefix
-        clean_description = origin_description
-        if origin_description != reference:
-            if origin_description.startswith(reference):
-                clean_description = origin_description.removeprefix(reference).strip()
-            elif origin_description.startswith(product.name):
-                clean_description = origin_description.removeprefix(product.name).strip()
-
-        if add_product_name and clean_description and clean_description != origin_description:
-            name = f"{product.name} - {clean_description}"
-        else:
-            name = clean_description or origin_description
-
-        properties.update(
-            {
+            if add_product_name and clean_description and clean_description != origin_description:
+                name = f"{product.name} {'-'} {clean_description}"
+            else:
+                name = clean_description if clean_description else origin_description
+            line_key = f"{product.id}_{name}_{uom.id}_{move.packaging_uom_id or ''}"
+            bom_line = getattr(move, "bom_line_id", False)
+            if bom_line and bom_line.bom_id:
+                bom = bom_line.bom_id
+                line_key += f"_{bom.id if bom else ''}"
+            else:
+                bom = False
+            return {
+                "line_key": line_key,
                 "name": name,
-                # el origen ya viaja en el nombre, no lo repetimos abajo
-                "description": "",
-                # sumamos el origen a la clave del super para no fusionar orígenes distintos
-                "line_key": f"{properties['line_key']}_{name}",
+                "product_uom": uom,
+                "move": move,
+                "packaging_uom_id": move.packaging_uom_id,
+                "bom": bom,
             }
-        )
-        return properties
+        else:
+            return super()._get_aggregated_properties(move_line=move_line, move=move)

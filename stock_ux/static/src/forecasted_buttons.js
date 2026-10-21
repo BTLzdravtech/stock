@@ -1,26 +1,29 @@
 /** @odoo-module **/
 import { ForecastedButtons } from "@stock/stock_forecasted/forecasted_buttons";
-import { patch } from '@web/core/utils/patch';
-import { onWillStart } from "@odoo/owl";
-
+import { patch } from "@web/core/utils/patch";
+import { useState } from "@odoo/owl";
 
 patch(ForecastedButtons.prototype, {
-    after() {
-        this._super.apply(this, arguments); // Llama al método original
-        onWillStart(async () => {
-            this.context = this.props.action.context;
-            this.productId = this.context.active_id;
-            this.resModel = this.props.resModel || 'product.template';
-        });
+    setup() {
+        super.setup(...arguments);
+        this.movementsState = useState({ visible: false });
+        this._loadMovementsVisibility();
     },
 
-    async _onClickTrace(){
-        return this.actionService.doAction("stock.stock_move_action", {
-            additionalContext: {
-                search_default_future: 1,
-                search_default_picking_type: 1,
-                search_default_product_id: this.productId,
-            },
-        });
-    }
+    async _loadMovementsVisibility() {
+        const [company] = await this.orm.read("res.company", [this.context.company_id], ["country_code"]);
+        this.movementsState.visible = company?.country_code === "AR";
+    },
+
+    async _onClickTrace() {
+        const action = await this.actionService.loadAction("stock.stock_move_action");
+        const field = this.resModel === "product.product" ? "product_id" : "product_id.product_tmpl_id";
+        action.domain = [[field, "=", this.productId]];
+        action.context = {
+            ...action.context,
+            search_default_future: 1,
+            search_default_picking_type: 1,
+        };
+        return this.actionService.doAction(action);
+    },
 });

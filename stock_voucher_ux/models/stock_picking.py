@@ -3,6 +3,7 @@
 # directory
 ##############################################################################
 from odoo import _, api, fields, models
+from odoo.addons.web.controllers.utils import clean_action
 from odoo.exceptions import UserError
 
 
@@ -41,9 +42,17 @@ class StockPicking(models.Model):
 
     def assign_numbers(self, estimated_number_of_pages, book):
         # Único punto por el que pasan todos los caminos de numeración.
+        # Un remito ya asignado no se renumera: para eso está "Limpiar remitos".
+        if self.voucher_ids:
+            return
         # Sólo se numera un traslado despachado: imprimir antes es vista previa.
-        # El tipo que exige el remito para validar tiene que numerar antes.
-        if self.state != "done" and not self.voucher_required:
+        # El tipo que exige el remito para validar, o que lo permite expresamente,
+        # numera antes.
+        if (
+            self.state != "done"
+            and not self.voucher_required
+            and not self.picking_type_id.allow_voucher_before_validation
+        ):
             return
         self._check_voucher_cai_range(book, estimated_number_of_pages)
         return super().assign_numbers(estimated_number_of_pages, book)
@@ -97,9 +106,55 @@ class StockPicking(models.Model):
             and self.book_id
             and self.picking_type_id.auto_print_delivery_slip
         ):
-            if self.autoprinted:
-                return self.do_print_voucher()
-            return self.do_print_and_assign()
+            # ``discard_logo_check`` evita que ``report_action`` devuelva el wizard de
+            # configuración del membrete en vez del reporte: una validación no es el
+            # momento de configurarlo, y el core ya lo saltea con ``config=False``.
+            picking = self.with_context(discard_logo_check=True)
+            voucher_action = picking.do_print_voucher() if self.autoprinted else picking.do_print_and_assign()
+            return self._merge_voucher_print_action(res, voucher_action)
+        return res
+
+    def _merge_voucher_print_action(self, res, voucher_action):
+        """Devolver el remito dentro de la acción cliente ``do_multi_print`` del core.
+
+        Un ``ir.actions.report`` pelado sólo lo ejecuta el formulario: el cliente
+        de Código de barras descarta toda acción sin ``res_model`` que no sea
+        ``ir.actions.client``, y el traslado queda validado sin bajar el PDF.
+        """
+        clean_action(voucher_action, self.env)
+        reports = []
+        another_action = False
+        if isinstance(res, dict) and res.get("tag") != "do_multi_print":
+            # Otra acción del core (p. ej. el reporte de recepción): no se descarta,
+            # viaja donde el cliente la espera después de imprimir.
+            another_action = res
+        elif isinstance(res, dict):
+            params = res.get("params") or {}
+            # El remito reemplaza al recibo de entrega que arma el core con el
+            # mismo reporte: el nuestro va numerado y con el contexto que el
+            # preimpreso necesita para que el controller cuente las hojas. Se
+            # compara contra el reporte propio y no contra
+            # ``stock.action_report_delivery`` porque ``report_substitute``
+            # resuelve la regla de sustitución dentro de ``report_action``.
+            voucher_report = voucher_action.get("report_name")
+            reports = [report for report in params.get("reports") or [] if report.get("report_name") != voucher_report]
+            another_action = params.get("anotherAction", False)
+        return {
+            "type": "ir.actions.client",
+            "tag": "do_multi_print",
+            "params": {"reports": [voucher_action] + reports, "anotherAction": another_action},
+        }
+
+    def _prepare_for_automatic_invoicing(self):
+        # Sólo llegan acá los traslados cuyo pedido se factura en esta misma
+        # validación: la factura se crea y se renderiza ahí, y tiene que mostrar
+        # el remito. El traslado ya está despachado. El preimpreso va por la
+        # estimación de hojas: las reales recién se saben al imprimir, tarde
+        # para esta factura.
+        res = super()._prepare_for_automatic_invoicing()
+        for picking in self.filtered(lambda p: p.book_required and p.book_id and not p.voucher_ids):
+            pages = 1 if picking.book_id.autoprinted else picking.get_estimated_number_of_pages()
+            picking.assign_numbers(pages, picking.book_id)
         return res
 
     def _action_done(self):
@@ -108,8 +163,12 @@ class StockPicking(models.Model):
         res = super(StockPicking, self.with_context(do_not_assign_numbers=True))._action_done()
         if self._context.get("do_not_assign_numbers"):
             return res
-        for picking in self.filtered(lambda p: p.book_required and p.book_id and p.book_id.autoprinted):
-            picking.assign_numbers(1, picking.book_id)
+        for picking in self.filtered("book_id"):
+            if picking.voucher_ids:
+                # Numerado antes de validar: el aviso al cliente esperaba el despacho.
+                picking._send_voucher_confirmation_email()
+            elif picking.book_required and picking.book_id.autoprinted:
+                picking.assign_numbers(1, picking.book_id)
         return res
 
     def clean_voucher_data(self):

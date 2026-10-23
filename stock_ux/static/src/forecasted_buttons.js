@@ -1,6 +1,7 @@
 /** @odoo-module **/
 import { ForecastedButtons } from "@stock/stock_forecasted/forecasted_buttons";
 import { patch } from "@web/core/utils/patch";
+import { user } from "@web/core/user";
 import { useState } from "@odoo/owl";
 
 patch(ForecastedButtons.prototype, {
@@ -11,7 +12,7 @@ patch(ForecastedButtons.prototype, {
     },
 
     async _loadMovementsVisibility() {
-        const [company] = await this.orm.read("res.company", [this.context.company_id], ["country_code"]);
+        const [company] = await this.orm.read("res.company", [user.activeCompany.id], ["country_code"]);
         this.movementsState.visible = company?.country_code === "AR";
     },
 

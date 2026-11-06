@@ -13,7 +13,7 @@ class AccountMove(models.Model):
         """
         self.ensure_one()
         rate_to_use = self.inverse_invoice_currency_rate if "inverse_invoice_currency_rate" in self._fields else 0.0
-        if not rate_to_use:
+        if not rate_to_use or self.company_id.country_code != "AR":
             return super().button_create_landed_costs()
 
         landed_costs_lines = self.line_ids.filtered("is_landed_costs_line")

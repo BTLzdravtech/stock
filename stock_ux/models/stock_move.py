@@ -102,10 +102,10 @@ class StockMove(models.Model):
     def check_cancel(self):
         if self.env.context.get("cancel_from_order") or self.env.is_superuser():
             return
+        if self.env.user.has_group("stock_ux.allow_picking_cancellation"):
+            return
         if self.filtered(
-            lambda x: x.picking_id
-            and x.state == "cancel"
-            and not self.env.user.has_group("stock_ux.allow_picking_cancellation")
+            lambda x: x.picking_id and x.state == "cancel" and x.company_id.country_code == "AR"
         ):
             raise ValidationError("Only User with 'Picking cancelation allow' rights can cancel pickings")
 
@@ -212,14 +212,15 @@ class StockMove(models.Model):
             return
 
         protected_moves = self.env["stock.move"]
+        ar_moves = self.filtered(lambda m: m.company_id.country_id.code == "AR")
 
         # Check moves from sales (if sale_stock is installed)
         if "sale_line_id" in self._fields:
-            protected_moves |= self.filtered(lambda m: m.sale_line_id)
+            protected_moves |= ar_moves.filtered(lambda m: m.sale_line_id)
 
         # Check moves from purchases (if purchase_stock is installed)
         if "purchase_line_id" in self._fields:
-            protected_moves |= self.filtered(lambda m: m.purchase_line_id)
+            protected_moves |= ar_moves.filtered(lambda m: m.purchase_line_id)
 
         if protected_moves:
             raise UserError(

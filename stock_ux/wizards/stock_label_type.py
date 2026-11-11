@@ -62,6 +62,10 @@ class ProductLabelLayout(models.TransientModel):
                 rec["from_template"] = True
         return rec
 
+    def _label_company(self):
+        # product.label.layout has no company_id field in Odoo 19.
+        return self.picking_id.company_id or self.move_ids.company_id[:1] or self.env.company
+
     def _line_commands_from_moves(self, moves):
         """Build Command.create list for line_ids (done qty > 0 only)."""
         return [
@@ -72,7 +76,7 @@ class ProductLabelLayout(models.TransientModel):
     def process(self):
         """Use the custom ZPL report only for Argentine companies."""
         self.ensure_one()
-        if self.company_id.country_id.code != "AR":
+        if self._label_company().country_id.code != "AR":
             return super().process()
         if self.zpl_template == "zpl_5x25":
             if self.picking_id:
@@ -83,7 +87,7 @@ class ProductLabelLayout(models.TransientModel):
     def _prepare_report_data(self):
         """Use per-product quantities only for Argentine companies."""
         xml_id, data = super()._prepare_report_data()
-        if self.company_id.country_id.code != "AR":
+        if self._label_company().country_id.code != "AR":
             return xml_id, data
         if self.picking_id and self.move_quantity == "custom" and self.line_ids:
             qty_map = {}

@@ -55,7 +55,8 @@ class StockPicking(models.Model):
         draft or cancel
         """
         not_del_pickings = self.filtered(
-            lambda x: x.picking_type_id.block_picking_deletion or x.state not in ("draft", "cancel")
+            lambda x: x.company_id.country_code == "AR"
+            and (x.picking_type_id.block_picking_deletion or x.state not in ("draft", "cancel"))
         )
         if not_del_pickings:
             raise ValidationError(

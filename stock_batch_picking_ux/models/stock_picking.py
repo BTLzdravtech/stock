@@ -46,7 +46,15 @@ class StockPicking(models.Model):
                         if not pack.quantity:
                             pack.unlink()
 
+            # A move only completes on _action_done when picked; force_transfer forces the
+            # quantities, so mark its moves picked too (otherwise nothing is done in 18.0).
+            pick.move_ids.filtered(lambda m: m.state not in ("done", "cancel")).picked = True
             pick._action_done()
+            # force_transfer validates a picking directly, skipping button_validate, which is
+            # where core drops a done picking from a wave whose other pickings are still open.
+            # Without this the done picking stays in the wave and its sanity check rejects it.
+            if pick.batch_id and any(sibling.state != "done" for sibling in pick.batch_id.picking_ids):
+                pick.batch_id = False
 
     def _action_generate_backorder_wizard(self, show_transfers=False):
         if self._context.get("picking_batches", False):
